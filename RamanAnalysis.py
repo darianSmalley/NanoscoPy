@@ -1,132 +1,160 @@
-# This cell needs to be cleaned up some, as it's likely that not all of the imported packages will be
-# used in the final code.
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
+from scipy.signal import find_peaks, peak_prominences, savgol_filter
+from scipy.special import erfc
+from lmfit.models import GaussianModel , LorentzianModel, VoigtModel , ConstantModel
 import numpy as np
-import math
+from math import pi, sqrt, log , exp
 
-# Below are packages which have been used uring various stages of development,
-# but may or may not be used in the final version (and should be cleaned up to remove any
-# extraneous packages at the end.
-from scipy.signal import find_peaks, peak_prominences
-from scipy.signal import savgol_filter
-import numpy.polynomial.polynomial as poly
-import glob
-import os
-import sys
-from lmfit import Model, models, Parameters, report_fit
-from lmfit.models import LinearModel, ConstantModel, VoigtModel, LorentzianModel, GaussianModel
-from lmfit.lineshapes import gaussian, lorentzian
+# To do list:
+#   - Make it so that pre-defined models also use the height/FWHM-> amplitude/sigma conversions.
+#   - Add documentation to this file.
+#   - Make a 'tutorial' jupyter notebook demonstrating functionality and how to use it.
+#   - Add additional models (for MoS2, WS2, maybe some PL models, etc.)
+#   - Make a function which will automatically handle 'custom' or 'None' materials, automatically calling the locate_peaks, etc. functions to create a model
+#   - Make a function which will append results to a dataframe and/or output to a file
+#   - Move the file loader/conditioner to a file in a separate module and include a 'translator' file for the Renishaw files.
+#   - Implement the height/FWHM -> amplitude/sigma conversions for Voigt type peaks
+#   - Add a check to see if there is a fitting model define before running the fitting algorithm
+#   - Add functionality to let the user choose what kind of background to use (if any).
+#   - Add functionality to let the user normalize the data (norm. to max value, area under curve, etc.)
+#   - Add functionality to let the user specify bounds for the fitting parameters.
+#   - Add functionality to let the user save/load models from a file.
+#   - Add functionality to make a plot showing the individual peaks overlaid on the original data.
 
-df = read_raman_data()
-df = filter_data(df, shiftMin=1200, shiftMax=3400)
-df = reindex_data(df)
-model = fit_data(df)
-fig4, ax4 = model.plot(data_kws={'markersize': 1})
-plt.ylim(0, 2000)
-print(model.fit_report())
+class Spectrum:
+    def __init__(self,input_data,material=None):    
+        """
+        input_data: (numpy array) with the leftmost column being the x data.
+        material: (string) default is None
+        """
+        self.data_x = input_data[:,0]
+        self.data_y = input_data[:,1]
+        self.material = material
+        self.model = None
+        self.results = None
+    
+    def filter_data(self,x_min,x_max):
+        """
+        x_min: (numeric) lower endpoint of desired x data range.
+        x_max: (numeric) upper endpoint of desired x data range.
+        """
+        keep_elements = (self.data_x >= x_min) & (self.data_x <= x_max)
+        self.data_x = self.data_x[keep_elements]
+        self.data_y = self.data_y[keep_elements]
+    
+    def locate_peaks(self,filter_window_length=9,filter_polyorder=1,finder_prominence=20):
+        """
+        Search through the data and find peaks.
+        """
+        # Smooth data before peak finding (to reduce the influence of noise)
+        Intensity_denoised = savgol_filter(self.data_y, filter_window_length, filter_polyorder)
+        # Find the peaks in the denoised intensity data.
+        peak_indices, peak_properties = find_peaks(Intensity_denoised, prominence=finder_prominence, wlen=30, width=5)
+        return peak_indices , peak_properties
 
+    def generate_model_parameters(self,peak_indices,peak_properties,peak_type='Lorentzian'):
+        """
+        Use this to generate the model parameters for a set of peaks automatically found using the "loacate_peaks" method.
+        """
+        generated_model = []
+        for i in range(len(peak_indices)):
+            new_peak = {'name':'peak_'+str(i),
+                        'type': peak_type,
+                        'center': {'value':self.data_x[peak_indices[i]]},
+                        'height': {'value':self.data_y[peak_indices[i]]},
+                        'FWHM': {'value':peak_properties['widths'][i]}
+                        }
+            generated_model.append(new_peak)
+        return generated_model
 
-def read_raman_data():
-    """Read raman data, sort, reindex and drop old indicies. Returns formatted dataframe."""
-    # Specify file location and name
-    filename = '2019012-18_Graphene_JTDS_'
-    extension = '.txt'
-    subfolder = 'Raman_Data'
-    directory = os.path.abspath('')
-    designation = 'Top'
-    path = directory+'\\'+subfolder+'\\'+filename+designation+'_'+extension
+    def define_peak(self,peak_parameters,peak_num):
+        # Define the peak prefix. [To do: Add option to auto-generate name.]
+        peak_prefix = peak_parameters['name'] + '_' #'p' + str(peak_num) + '_'
+        
+        # Define the peak shape. [To do: add functionality to select other peaks.]
+        if peak_parameters['type'] in ['Lorentzian', 'lorentzian']:
+            peak_model = LorentzianModel(prefix = peak_prefix)
+        elif peak_parameters['type'] in ['Gaussian', 'gaussian']:
+            peak_model = GaussianModel(prefix = peak_prefix)
+        elif peak_parameters['type'] in ['Voigt', 'voigt']:
+            peak_model = VoigtModel(prefix = peak_prefix)
+        
+        amplitude , sigma = convert_parameters(peak_parameters)
 
-    # Load data into a dataframe and assign more descriptive column labels
-    df = pd.read_csv(path, sep='\t', engine='python',
-                     names=['Raman Shift', 'Intensity'])
+        # Set an initial guess for the peak center position.
+        center_value = peak_parameters['center']['value']
+        peak_model.set_param_hint('center', value = center_value, min= 0.9*center_value, max=1.1*center_value )
 
-    # Sort dataframe in ascending order
-    df = df.sort_values('Raman Shift')
+        # Set initial guess for peak height.
+        #peak_model.set_param_hint('amplitude', value=peak_parameters['height']['value'])
+        peak_model.set_param_hint('amplitude', value=amplitude, min=amplitude/5,max=amplitude*5)
 
-    return df
+        # Set initial guess for peak width. [To do: add function to convert between FWHM and lmfit's sigma.]
+        #peak_model.set_param_hint('sigma', value = peak_parameters['FWHM']['value']/2)
+        peak_model.set_param_hint('sigma', value = sigma, min = sigma/5, max=sigma*5)
 
+        return peak_model
+    
+    def make_composite_model(self,model_parameters):
+        # Initialize the model with a background model.
+        background = ConstantModel(prefix='back_')
+        background.set_param_hint('c', value=np.min(self.data_y), min=1e-6)
+        self.model = background
 
-def filter_data(df, shiftMin, shiftMax):
-    """Selects the data within the desired range: ShiftMin <= v <= ShiftMax"""
-    df_filtered = df[(df['Raman Shift'] > shiftMin) &
-                     (df['Raman Shift'] < shiftMax)]
-    return df_filtered
+        # Add peak models.
+        peak_num = 0
+        for peak_parameters in model_parameters:
+            self.model = self.model + self.define_peak(peak_parameters,peak_num)
+            peak_num = peak_num + 1
+    
+    def fit_spectrum(self):
+        params = self.model.make_params()
+        self.results = self.model.fit(self.data_y, params, x=self.data_x)
+    
+def convert_parameters(peak_parameters):
+        height = peak_parameters['height']['value']
+        FWHM = peak_parameters['FWHM']['value']
+        
+        if peak_parameters['type'] in ['Lorentzian', 'lorentzian']:
+            sigma = FWHM/2
+            amplitude = height * sigma * pi
+        elif peak_parameters['type'] in ['Gaussian', 'gaussian']:
+            sigma = FWHM / (2 * sqrt(2 * log(2) )) # The denominator is approximately equal to 2.35482004503.
+            amplitude = height * sigma * sqrt(2 * pi)
+        elif peak_parameters['type'] in ['Voigt', 'voigt']:
+            sigma = FWHM / 3.6013 # Approximation from lmfit documentation for VoigtModel
+            
+            # Define variables needed to calculate parameters for Voigt peak
+            gamma = sigma # It is commonly assumed that the parameter gamma is equal to sigma
+            z = 1j * gamma / (sigma * sqrt(2)) # Note: j is the imaginary unit (sqrt(-1))
+            w = np.exp(-z**2) * erfc(-1j * z)
+            amplitude = height * sigma * sqrt(2 * pi) / w.real
+        else:
+            print('Function not implemented.')
+        return amplitude , sigma
 
-
-def reindex_data(df):
-    # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
-    df.reset_index(inplace=True)
-
-    # Drop previous column of indcies which we will not use
-    df = df.drop(columns=['index'])
-
-    return df
-
-
-def fit_data(df):
-    """Sets up the fitting models for the individual peaks. These individual models will be combined into a composite model used to fit to the whole spectrum."""
-    # Perform smoothing of the data as a means of denoising.
-    # Filter window length and fitting order may need to be optimized for different datasets.
-    Intensity_denoised = savgol_filter(df['Intensity'], 9, 1)
-
-    # Plot the resulting, smoothed data
-    _, ax1 = plt.subplots()
-    plt.plot(df['Raman Shift'], df['Intensity'], label='Raw Data')
-    plt.plot(df['Raman Shift'], Intensity_denoised,
-             'r-', label='Smoothed Data')
-    plt.legend()
-
-    # Find the approximate peak locations. peak_properties contains estimates of the widths of the peaks.
-    # The prominence, wlen and peak width parameters may need to be optimized for different datasets.
-    peak_indices, peak_properties = find_peaks(
-        Intensity_denoised, prominence=20, wlen=30, width=5)
-
-    fig = plt.figure(figsize=(12, 6))
-    ax1 = fig.add_subplot(111)
-    plt.plot(df['Raman Shift'], Intensity_denoised, label='Smoothed Data')
-    ax1.scatter(df['Raman Shift'][peak_indices], df['Intensity']
-                [peak_indices], s=40, color='r', label="Peaks")
-    plt.legend()
-
-    # Initialize the model for the background with a prefix for future reference. Typically this will either be ConstantModel or LinearModel.
-    background = ConstantModel(prefix='back_')
-
-    # Give the fitting routine an initial guess of parameter for this model.
-    background.set_param_hint('c', value=50, min=0, max=1000)
-
-    # Set the background to be the first sub-model in the full composite model to describe the whole spectrum.
-    composite_model = background
-
-    # Initialize one individual model for each detected peak.
-    for n in range(0, len(peak_indices)):
-        # Define the model type to be used for the peak.
-        # Note: This code assumes that all the peaks are to be fitted to the same type of peak (a lorentzian, in this case),
-        # but it may be the case that different peaks may be better fitted by different peak shapes (e.g. gaussian, lorenztian or voigt)
-        # due to presence or absence of broadening (due to thermal effects, defects, etc.)
-        model = LorentzianModel(prefix='p' + str(n) + '_')
-
-        # Determine and set the approximate center position of the peak (from the earlier peak-finding)
-        peak_center = df['Raman Shift'][peak_indices[n]]
-        model.set_param_hint('center', value=peak_center,
-                             min=peak_center - 15, max=peak_center + 15)
-
-        # Determine and set the approximate peak width (actual name for this depends on the model chosen) from the previous peak-fitting.
-        peak_width = peak_properties['widths'][n]
-        model.set_param_hint('sigma', value=peak_width,
-                             min=0.5 * peak_width, max=2 * peak_width)
-
-        # Determine and set the approximate amplitude of the peak. Amplitude is related to the max height of the peak, but is not identical too it.
-        peak_amplitude = df['Intensity'][peak_indices[n]] * \
-            math.pi * peak_width
-        model.set_param_hint('amplitude', value=peak_amplitude,
-                             min=0.75 * peak_amplitude, max=1.25 * peak_amplitude)
-
-        # Add the individual model to the composite model.
-        composite_model = composite_model + model
-        params = composite_model.make_params()
-        output = composite_model.fit(
-            df['Intensity'], params, x=df['Raman Shift'])
-
-    return output
+model_graphene = [
+    {'name':'pk_D',
+    'type': 'Lorentzian',
+    'center': {'value':1350},
+    'height': {'value':30},
+    'FWHM': {'value':38} 
+    } ,
+    {'name':'pk_G',
+    'type': 'Lorentzian',
+    'center': {'value':1587},
+    'height': {'value':700},
+    'FWHM': {'value':12} 
+    } ,
+    {'name':'pk_DplusDprime',
+    'type': 'Gaussian',
+    'center': {'value':2457},
+    'height': {'value':80},
+    'FWHM': {'value':40} 
+    } ,
+    {'name':'pk_2D',
+    'type': 'Voigt',
+    'center': {'value':2690},
+    'height': {'value':1800},
+    'FWHM': {'value':30} 
+    }
+    ]
