@@ -17,14 +17,18 @@ def lennard_jones(r , sigma , epsilon , LJ_form = 'standard'):
     LJ_form: string. Specifies whether the user wants the 'standard' 6-12 L.J potential or the modified version.
     
     Outputs:
-    The output is the calculated potential as a numpy array.
+    V: numpy array. This contains the generate potential.
+    F: numpy array. This contains the force corresponding to the generated potential.
     """
     if LJ_form == 'standard':
         # Generate the standard '6-12' Lennard-Jones potential.
-        return 4 * epsilon * ( np.divide(sigma , r) ** 12 - np.divide(sigma , r) ** 6 )
+        V = 4 * epsilon * ( np.divide(sigma , r) ** 12 - np.divide(sigma , r) ** 6 )
+        F = 24 * epsilon / sigma * ( np.divide(sigma , r) ** 13 - np.divide(sigma , r) ** 7 )
     elif LJ_form == 'modified':
         # Generate a modified version of the '6-12' Lennard-Jones potential.
-        return - epsilon * ( 2 * np.divide(sigma , r) ** 6 - np.divide(sigma , r) ** 12 )
+        V = - epsilon * ( 2 * np.divide(sigma , r) ** 6 - np.divide(sigma , r) ** 12 )
+        F = - 12 * epsilon / sigma * ( np.divide(sigma , r) ** 7 - np.divide(sigma , r) ** 13 )
+    return V , F
 
 def Force_from_Potential(r , V):
     """
@@ -75,7 +79,8 @@ def frequency_shift(z_ltp , f_0 , k , A , E_bond , sigma , potential_type = 'Len
         term2 = np.multiply( np.divide(sigma , z_ltp)**13 , hyp2f1(13 , 0.5 , 1 , argument) - hyp2f1(13 , 1.5 , 2 , argument) )
         freq_shift = prefactor * (term1 - term2)
     elif potential_type == 'Morse':
-        print('This feature has not been implemented yet.')
+        print('Warning: This feature has not been implemented yet.')
+        freq_shift = math.nan
     return freq_shift
 
 ################################################################
@@ -95,7 +100,7 @@ def saderF(z , Delta_f , A , k , f_0):
     
     Outputs:
     z: numpy array. Truncated version of the input height data. Included as convenience for plotting recovered force data. Has units of m.
-    F: numpy array. Recovered force in units of N.
+    F_recovered: numpy array. Recovered force in units of N.
     
     Note: This function was adapted from MATLAB code written by the authors of the following journal article. The original MATLAB code can be found in the supplementary info section of the journal article on the publisher's webpage.
     
@@ -127,7 +132,7 @@ def saderF(z , Delta_f , A , k , f_0):
     prefactor = 2 * k / f_0
 
     # Initialize a vector to store the recovered force values in.
-    F_recovered = []
+    F_recovered = np.zeros(len(z) - 1)
     
     # Calculate the recovered force for each data point. j is the index of the z value under consideration for any particular iteration of the loop.
     for j in range(0 , len(z) - 1): # Iterate over the whole (shortened) z vector except the last element. Skip the last element because this serves as the upper limit of the integral ("infinity"), which we won't use in a numeric integration.
@@ -152,8 +157,6 @@ def saderF(z , Delta_f , A , k , f_0):
         corr3 = 2 * A**(3/2) / math.sqrt(2) * math.sqrt(z[j+1] - z[j]) * (Delta_f[j+1] - Delta_f[j]) / (z[j+1] - z[j])
 
         # Calculate the recovered force for the jth data point.
-        F_j = prefactor * (corr1 + corr2 + corr3 + integral)
+        F_recovered[j] = prefactor * (corr1 + corr2 + corr3 + integral)
 
-        # Save calculations to vectors
-        F_recovered.append(F_j)
-    return z[:-1] , np.array(F_recovered)
+    return z[:-1] , F_recovered
