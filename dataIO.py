@@ -19,7 +19,7 @@ def determine_metadata_lines(path , source = 'Nanonis'):
             filepath = os.path.join(*path)
         
         # Load only the first column of data.
-        data_column = pd.read_csv(filepath , sep = '\t' , usecols = [0] , header = None)
+        data_column = pd.read_csv(path , sep = '\t' , usecols = [0] , header = None)
         
         # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
         metadata_end = data_column[ data_column[0] == "[DATA]"].index[0]
