@@ -69,7 +69,7 @@ def read_sxm(path):
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
     
     Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+        data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
     data = pySPM.SXM(path)
 
@@ -93,20 +93,21 @@ def read_mtrx(path):
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
     
     Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+        data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
     mtrx = access2thematrix.MtrxData()
 
     try: 
         traces, message = mtrx.open(path)
         image, message = mtrx.select_image(traces[0])
-        return image.data
+        image = image.data[~np.isnan(image.data)]
+        return image
     
     except Exception as error:
         print(message)
         raise
 
-def read_dir(directory, signal = None):
+def read_dir(directory, signal = None, filter = '', ext = 'dat'):
     """
     Imports tabular data from a text file.
 
@@ -117,16 +118,19 @@ def read_dir(directory, signal = None):
     Outputs:
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    paths = glob.glob(os.path.join(directory, "*"))
+    paths = glob.glob(os.path.join(directory, f"*{filter}*.{ext}"))
     
+    if len(paths) == 0:
+        raise ValueError("No files found.")
+
     if paths[0].endswith(".dat"):
-        data = list(map(read_spectrum(paths, signal)))
+        data = list(map(lambda p: read_spectrum(p, signal), paths))
     
     elif paths[0].endswith(".sxm"):
-        data = list(map(read_sxm(paths)))
+        data = list(map(read_sxm, paths))
             
     elif paths[0].endswith(".Z_mtrx"):
-        data = list(map(read_mtrx(paths)))
+        data = list(map(read_mtrx, paths))
         
     elif paths[0].endswith(".3ds"):
         pass
