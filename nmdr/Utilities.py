@@ -39,3 +39,19 @@ def rename_with_padding(source_folder_path , destination_folder_path , copy_file
         else:
             # Rename files in place with padding if copy_files is not set to True
             os.rename( os.path.join(source_folder_path, file) , os.path.join(destination_folder_path , new_filename ))
+
+def sort_data_ascending(data, indep_variable_name):
+    """
+    Checks whether the input data is sorted in ascending order.
+    
+    Inputs:
+        data: DataFrame. Contains the data to be sorted.
+        indep_variable_name: string. Specifies the column name in data which is the independent variable to be used for sorting.
+    
+    Outputs:
+        data: DataFrame. Contains the data, sorted in ascending order.
+    """
+    if data[indep_variable_name][1] < data[indep_variable_name][0]:
+        data = data.reindex(index = data.index[::-1]) # Reverse the order of the elements (put it in ascending order)
+        data.reset_index(inplace = True, drop = True) # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
+    return data
