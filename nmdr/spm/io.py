@@ -4,6 +4,11 @@ import numpy as np
 import pandas as pd
 import pySPM
 import access2thematrix
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+FILES_NOT_FOUND_ERROR = "No files found."
+FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat, sxm, Z_mtrx, and 3ds are supported."
 
 def determine_metadata_lines(path, source = 'Nanonis'):
     """
@@ -39,12 +44,7 @@ def read_spectrum(path, signal = None):
     
     Outputs:
         data: DataFrame. Contains the imported data. Most of the signals also ensure that the data is sorted such that the independent variable is is ascending order.
-    """
-    # # Determine if the path was specified as a list of path snipets
-    # if isinstance(path, list):
-    #     # Use list unpacking to separate elements into multiple arguments, then join them into a proper path.
-    #     filepath = os.path.join(*path)
-    
+    """  
     # Determine the number of header rows in the file.
     metadata_end = determine_metadata_lines(path , source = 'Nanonis')
     
@@ -71,9 +71,8 @@ def read_sxm(path):
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    data = pySPM.SXM(path)
-
     try:
+        data = pySPM.SXM(path)
         # Get Z scan pixels
         image = data.get_channel('Z').pixels
         # Convert to numpy array
@@ -95,9 +94,8 @@ def read_mtrx(path):
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    mtrx = access2thematrix.MtrxData()
-
     try: 
+        mtrx = access2thematrix.MtrxData()
         traces, message = mtrx.open(path)
         image, message = mtrx.select_image(traces[0])
         image = image.data[~np.isnan(image.data)]
@@ -107,7 +105,7 @@ def read_mtrx(path):
         print(message)
         raise
 
-def read_dir(directory, signal = None, filter = '', ext = 'dat'):
+def read_spectra(paths, signal = None):
     """
     Imports tabular data from a text file.
 
@@ -118,23 +116,99 @@ def read_dir(directory, signal = None, filter = '', ext = 'dat'):
     Outputs:
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    paths = glob.glob(os.path.join(directory, f"*{filter}*.{ext}"))
-    
-    if len(paths) == 0:
-        raise ValueError("No files found.")
-
     if paths[0].endswith(".dat"):
         data = list(map(lambda p: read_spectrum(p, signal), paths))
+
+    elif paths[0].endswith(".3ds"):
+        pass
+
+    return data
+
+def read_spm(paths):
+    """
+    Imports tabular data from a text file.
+
+    Inputs:
+        path: string. Specifies the full file path (including file extension) of the file to be imported.
+        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
     
-    elif paths[0].endswith(".sxm"):
+    Outputs:
+        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    """
+    if paths[0].endswith(".sxm"):
         data = list(map(read_sxm, paths))
             
     elif paths[0].endswith(".Z_mtrx"):
         data = list(map(read_mtrx, paths))
-        
-    elif paths[0].endswith(".3ds"):
-        pass
-    else:
-        raise ValueError("SUPPORTED FILETYPE NOT FOUND. Only dat, sxm, Z_mtrx, and 3ds are supported.")
 
     return data
+
+def read(path, filter = '', signal = None):
+    """
+    Imports tabular data from a text file.
+
+    Inputs:
+        path: A path-like object representing a file system path. A path-like object is either a string or bytes object representing a path.
+        filter: A string which specifies which files should be read.
+    
+    Outputs:
+        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    """
+    spm_ext = tuple(['.sxm', '.Z_mtrx'])
+    sts_ext = tuple(['.dat', '.3ds'])
+
+    # Check if path leads to a file or a folder
+    if os.path.isfile(path):
+        # If file ends with supported spm file extension,
+        # read file with appropraite import function
+        if path.endswith('.sxm'):
+            data = read_sxm(path)
+        elif path.endswith('.Z_mtrx'):
+            data = read_mtrx(path)
+        elif path.endswith('.dat'):
+            data = read_spectrum(path, signal)
+        elif path.endswith('.3ds'):
+            pass
+        else:
+            raise ValueError(FILETYPE_ERROR)
+
+        return data, path            
+    # if path points to a folder, 
+    # get all paths in folder according to filter
+    else:
+        paths = glob.glob(os.path.join(path, f"*{filter}*"))
+
+        # Check if any files were found
+        if len(paths) == 0:
+            raise ValueError(FILES_NOT_FOUND_ERROR)
+            
+        # Read files with appropriate import function
+        elif paths[0].endswith(spm_ext):
+            data = read_spm(paths)
+        elif paths[0].endswith(sts_ext):
+            data = read_spectra(paths, signal)
+        else:
+            raise ValueError(FILETYPE_ERROR)
+
+        return data, paths
+    
+def export_spm(images, dst_paths = ['./'], ext = 'jpeg', 
+               scan_dir = 'up', cmap = 'gray'):
+    """
+    Exports image from numpy array
+
+    Inputs:
+        path: string. Specifies the full file path (including file extension) of the file to be imported.
+        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
+    
+    Outputs:
+        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    """
+    if not isinstance(images, list): images = [images]
+    if not isinstance(dst_paths, list): dst_paths = [dst_paths]
+
+    for image, path in zip(images, dst_paths):
+        path_without_ext = Path(path).with_suffix('')
+        dst = f'{path_without_ext}.{ext}'
+        origin = 'lower' if scan_dir == 'up' else 'upper'
+        plt.imsave(dst, image, cmap=cmap, origin=origin)

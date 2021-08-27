@@ -22,13 +22,14 @@ def basic_flatten(image):
     return im
 
 def flatten(images):
-    flattened = []
+    output = []
     for image in images:
         try:
-            image = basic_flatten(image)
-            flattened.append(image)
+            flattened = basic_flatten(image)
+            output.append(flattened)
 
         except Exception as error:
             print(error)
+            output.append(image)
     
-    return flattened
+    return output
