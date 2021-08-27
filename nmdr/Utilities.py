@@ -55,3 +55,18 @@ def sort_data_ascending(data, indep_variable_name):
         data = data.reindex(index = data.index[::-1]) # Reverse the order of the elements (put it in ascending order)
         data.reset_index(inplace = True, drop = True) # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
     return data
+
+def convert_string_to_enot(num_string , sig_digits = 3):
+    """
+    Converts a string containing a number expressed in E-notation to a float.
+    
+    Inputs:
+        num_string: string. String containing characters for E-notation number.
+        sig_digits: int. The number of significant digits in the E-notation form of the number.
+    
+    Outputs:
+        Number as a float
+    """
+    magnitude = float(num_string[:sig_digits])
+    order_of_magnitude = int(num_string[-1:])
+    return magnitude * 10**order_of_magnitude
