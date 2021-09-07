@@ -75,6 +75,8 @@ def read_sxm(path):
         data = pySPM.SXM(path)
         # Get Z scan pixels
         image = data.get_channel('Z').pixels
+        # Close the sxm file
+        data.closefile() # Note: This method is from our modified version of SXM
         # Convert to numpy array
         image = np.asmatrix(image)
         return image
