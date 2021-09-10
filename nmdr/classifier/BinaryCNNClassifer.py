@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 import tensorflow as tf 
 from tensorflow.python.client import device_lib
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
-%load_ext tensorboard
+
 if tf.test.gpu_device_name(): 
     print('Default GPU Device:{}'.format(tf.test.gpu_device_name()))
 #     print(device_lib.list_local_devices())
