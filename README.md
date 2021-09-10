@@ -1,2 +1,2 @@
-# data-analysis
-A general repo for the analysis of various kinds of experimental data.
+# NanoscoPy
+An open source repo for the analysis of experimental microscopy data common in materials and surface science.
