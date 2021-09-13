@@ -6,7 +6,6 @@ requires = [
   "scipy",
   "numpy",
   "matplotlib",
-  "torch==1.9.0",
   "access2theMatrix",
   "lmfit",
   "pySPM",
