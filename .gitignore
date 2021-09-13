@@ -1,2 +1,5 @@
 # Ignore local api token files
 token.txt
+
+# Ignore distribution archives
+dist/
