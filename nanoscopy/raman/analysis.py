@@ -41,14 +41,14 @@ class Spectrum:
         self.data_x = self.data_x[keep_elements]
         self.data_y = self.data_y[keep_elements]
     
-    def locate_peaks(self,filter_window_length=9,filter_polyorder=1,finder_prominence=20):
+    def locate_peaks(self,filter_window_length=9,filter_polyorder=1,finder_prominence=20, wlen=30, width=5):
         """
         Search through the data and find peaks.
         """
         # Smooth data before peak finding (to reduce the influence of noise)
         Intensity_denoised = savgol_filter(self.data_y, filter_window_length, filter_polyorder)
         # Find the peaks in the denoised intensity data.
-        peak_indices, peak_properties = find_peaks(Intensity_denoised, prominence=finder_prominence, wlen=30, width=5)
+        peak_indices, peak_properties = find_peaks(Intensity_denoised, prominence=finder_prominence, wlen=wlen, width=width)
         return peak_indices , peak_properties
 
     def generate_model_parameters(self,peak_indices,peak_properties,peak_type='Lorentzian'):
