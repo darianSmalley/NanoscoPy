@@ -6,6 +6,7 @@ import pySPM
 import access2thematrix
 import matplotlib.pyplot as plt
 from pathlib import Path
+import SPMimage
 
 FILES_NOT_FOUND_ERROR = "No files found."
 FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat, sxm, Z_mtrx, and 3ds are supported."
@@ -62,7 +63,7 @@ def read_spectrum(path, signal = None):
 
 def read_sxm(path):
     """
-    Imports tabular data from a text file.
+    Need to update this docstring
 
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
@@ -72,13 +73,30 @@ def read_sxm(path):
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
     try:
+        # Open SXM file
         data = pySPM.SXM(path)
-        # Get Z scan pixels
-        image = data.get_channel('Z').pixels
+
+        # Create SPMImage class object
+        image = SPMimage()
+
+        # Get data and store in SPMImage class
+        for channel in ['Z' , 'Current']:
+            im_forward = data.get_channel(channel , direction = 'forward').pixels
+            im_backward = data.get_channel(channel , direction = 'backward').pixels
+
+            image.add_data(im_forward , channel , 'Forward')
+            image.add_data(im_backward , channel , 'Backward')
+
+        # Add records of important scan parameters
+        image.parameters['bias'] = float(data.header['Bias>Bias (V)'][0][0])
+        image.parameters['setpoint_value'] = float(data.header['Z-CONTROLLER'][1][3])
+        image.parameters['setpoint_unit'] = data.header['Z-CONTROLLER'][1][4]
+        image.parameters['width'] = data.size['real']['x']
+        image.parameters['height'] = data.size['real']['y']
+
         # Close the sxm file
         data.closefile() # Note: This method is from our modified version of SXM
-        # Convert to numpy array
-        image = np.asmatrix(image)
+        
         return image
 
     except Exception as error:
