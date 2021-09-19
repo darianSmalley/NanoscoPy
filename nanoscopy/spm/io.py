@@ -99,9 +99,14 @@ def read_mtrx(path):
     try: 
         mtrx = access2thematrix.MtrxData()
         traces, message = mtrx.open(path)
+        voltage, unit = mtrx.param['EEPA::GapVoltageControl.Voltage']
+        current, unit = mtrx.param['EEPA::Regulator.Setpoint_1']
+        scan_width, unit = mtrx.param['EEPA::XYScanner.Width']
+        scan_height, unit = mtrx.param['EEPA::XYScanner.Height']
+        metadata = {"voltage": voltage, "current": current, "width": scan_width, "height": scan_height}
         image, message = mtrx.select_image(traces[0])
         image = image.data[~np.isnan(image.data)]
-        return image
+        return image, metadata
     
     except Exception as error:
         print(message)
@@ -141,7 +146,7 @@ def read_spm(paths):
         data = list(map(read_sxm, paths))
             
     elif paths[0].endswith(".Z_mtrx"):
-        data = list(map(read_mtrx, paths))
+        data, metadata = list(map(read_mtrx, paths))
 
     return data
 
@@ -166,7 +171,7 @@ def read(path, filter = '', signal = None):
         if path.endswith('.sxm'):
             data = read_sxm(path)
         elif path.endswith('.Z_mtrx'):
-            data = read_mtrx(path)
+            data, metadata = read_mtrx(path)
         elif path.endswith('.dat'):
             data = read_spectrum(path, signal)
         elif path.endswith('.3ds'):
