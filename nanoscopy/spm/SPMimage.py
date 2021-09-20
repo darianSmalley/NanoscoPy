@@ -1,5 +1,6 @@
 class SPMImage:
-    def __init__(self):
+    def __init__(self, path=''):
+        self.path = path
         self.data = dict()
         self.parameters = dict()
     

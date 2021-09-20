@@ -6,60 +6,11 @@ import pySPM
 import access2thematrix
 import matplotlib.pyplot as plt
 from pathlib import Path
-import SPMimage
+from . import SPMimage
 
+spm_ext = tuple(['.sxm', '.Z_mtrx'])
 FILES_NOT_FOUND_ERROR = "No files found."
-FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat, sxm, Z_mtrx, and 3ds are supported."
-
-def determine_metadata_lines(path, source = 'Nanonis'):
-    """
-    Searches the beginning lines of a file containing tabular data to determine the number of lines at the beginning of the file contain metadata.
-    
-    Inputs:
-        path: string. Specifies the full file path of the file to be examined. Should include the file extension.
-        source: string. Specifies a family of instrument which generated the file to be examined. This determines how the algorithm locates the end of the metadata.
-    
-    Outputs:
-        metadata_end: int. Specifies the row index corresponding to the end of the metadata at the beginnong of the data file.
-    """
-    if source == 'Nanonis':
-        # Determine if the path was specified as a list of path snipets
-        if isinstance(path, list): 
-            # Use list unpacking to separate elements into multiple arguments, then join them into a proper path.
-            filepath = os.path.join(*path)
-        
-        # Load only the first column of data.
-        data_column = pd.read_csv(path , sep = '\t' , usecols = [0] , header = None)
-        
-        # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
-        metadata_end = data_column[ data_column[0] == "[DATA]"].index[0]
-    return metadata_end
-
-def read_spectrum(path, signal = None):
-    """
-    Imports tabular data from a text file.
-
-    Inputs:
-        path: string. Specifies the full file path (including file extension) of the file to be imported.
-        signal: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
-    Outputs:
-        data: DataFrame. Contains the imported data. Most of the signals also ensure that the data is sorted such that the independent variable is is ascending order.
-    """  
-    # Determine the number of header rows in the file.
-    metadata_end = determine_metadata_lines(path , source = 'Nanonis')
-    
-    # Load only the data portion (with column names), skipping the header.
-    data = pd.read_csv(path , sep = '\t' , header = 1 , skiprows = metadata_end)
-    
-    # Drop any rows that contain NaN as an element.
-    data = data.dropna()
-    
-    # Sort the data in ascending order.
-    if signal: 
-        data = data.sort_values(by=[signal])
-
-    return data
+FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only sxm and Z_mtrx are supported."
 
 def read_sxm(path):
     """
@@ -74,28 +25,28 @@ def read_sxm(path):
     """
     try:
         # Open SXM file
-        data = pySPM.SXM(path)
+        sxm = pySPM.SXM(path)
 
         # Create SPMImage class object
-        image = SPMimage()
+        image = SPMimage(path)
 
         # Get data and store in SPMImage class
         for channel in ['Z' , 'Current']:
-            im_forward = data.get_channel(channel , direction = 'forward').pixels
-            im_backward = data.get_channel(channel , direction = 'backward').pixels
+            im_forward = sxm.get_channel(channel , direction = 'forward').pixels
+            im_backward = sxm.get_channel(channel , direction = 'backward').pixels
 
             image.add_data(im_forward , channel , 'Forward')
             image.add_data(im_backward , channel , 'Backward')
 
         # Add records of important scan parameters
-        image.parameters['bias'] = float(data.header['Bias>Bias (V)'][0][0])
-        image.parameters['setpoint_value'] = float(data.header['Z-CONTROLLER'][1][3])
-        image.parameters['setpoint_unit'] = data.header['Z-CONTROLLER'][1][4]
-        image.parameters['width'] = data.size['real']['x']
-        image.parameters['height'] = data.size['real']['y']
+        image.parameters['bias'] = float(sxm.header['Bias>Bias (V)'][0][0])
+        image.parameters['setpoint_value'] = float(sxm.header['Z-CONTROLLER'][1][3])
+        image.parameters['setpoint_unit'] = sxm.header['Z-CONTROLLER'][1][4]
+        image.parameters['width'] = sxm.size['real']['x']
+        image.parameters['height'] = sxm.size['real']['y']
 
         # Close the sxm file
-        data.closefile() # Note: This method is from our modified version of SXM
+        sxm.closefile() # Note: This method is from our modified version of SXM
         
         return image
 
@@ -117,58 +68,36 @@ def read_mtrx(path):
     try: 
         mtrx = access2thematrix.MtrxData()
         traces, message = mtrx.open(path)
-        voltage, unit = mtrx.param['EEPA::GapVoltageControl.Voltage']
-        current, unit = mtrx.param['EEPA::Regulator.Setpoint_1']
-        scan_width, unit = mtrx.param['EEPA::XYScanner.Width']
-        scan_height, unit = mtrx.param['EEPA::XYScanner.Height']
-        metadata = {"voltage": voltage, "current": current, "width": scan_width, "height": scan_height}
-        image, message = mtrx.select_image(traces[0])
-        image = image.data[~np.isnan(image.data)]
-        return image, metadata
-    
+
+         # Create SPMImage class object
+        image = SPMimage(path)
+
+        # Get data and store in SPMImage class
+        for trace in traces:
+            trace_image, message = mtrx.select_image(trace)
+            trace_data = trace_image.data[~np.isnan(image.data)]
+            image.add_data(trace_data , trace , 'Forward')
+
+        # Retreive records of important scan parameters
+        setpoint, setpoint_unit = mtrx.param['EEPA::Regulator.Setpoint_1']
+        voltage, _ = mtrx.param['EEPA::GapVoltageControl.Voltage']
+        scan_width, _ = mtrx.param['EEPA::XYScanner.Width']
+        scan_height, _ = mtrx.param['EEPA::XYScanner.Height']
+
+        # Add important scan parameters to SPMimage
+        image.parameters['setpoint_value'] = setpoint
+        image.parameters['setpoint_unit'] = setpoint_unit
+        image.parameters['bias'] = voltage
+        image.parameters['width'] = scan_width
+        image.parameters['height'] = scan_height
+
+        return image
+
     except Exception as error:
         print(message)
         raise
 
-def read_spectra(paths, signal = None):
-    """
-    Imports tabular data from a text file.
-
-    Inputs:
-        path: string. Specifies the full file path (including file extension) of the file to be imported.
-        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
-    Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
-    """
-    if paths[0].endswith(".dat"):
-        data = list(map(lambda p: read_spectrum(p, signal), paths))
-
-    elif paths[0].endswith(".3ds"):
-        pass
-
-    return data
-
-def read_spm(paths):
-    """
-    Imports tabular data from a text file.
-
-    Inputs:
-        path: string. Specifies the full file path (including file extension) of the file to be imported.
-        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
-    Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
-    """
-    if paths[0].endswith(".sxm"):
-        data = list(map(read_sxm, paths))
-            
-    elif paths[0].endswith(".Z_mtrx"):
-        data, metadata = list(map(read_mtrx, paths))
-
-    return data
-
-def read(path, filter = '', signal = None):
+def read(path, filter = ''):
     """
     Imports tabular data from a text file.
 
@@ -179,43 +108,29 @@ def read(path, filter = '', signal = None):
     Outputs:
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    spm_ext = tuple(['.sxm', '.Z_mtrx'])
-    sts_ext = tuple(['.dat', '.3ds'])
-
     # Check if path leads to a file or a folder
     if os.path.isfile(path):
-        # If file ends with supported spm file extension,
-        # read file with appropraite import function
-        if path.endswith('.sxm'):
-            data = read_sxm(path)
-        elif path.endswith('.Z_mtrx'):
-            data, metadata = read_mtrx(path)
-        elif path.endswith('.dat'):
-            data = read_spectrum(path, signal)
-        elif path.endswith('.3ds'):
-            pass
-        else:
-            raise ValueError(FILETYPE_ERROR)
-
-        return data, path            
-    # if path points to a folder, 
-    # get all paths in folder according to filter
+        # If file, add to list as single element
+        paths = [path]          
     else:
+        # if path points to a folder, 
+        # get all paths in folder according to filter
         paths = glob.glob(os.path.join(path, f"*{filter}*"))
 
-        # Check if any files were found
-        if len(paths) == 0:
-            raise ValueError(FILES_NOT_FOUND_ERROR)
-            
-        # Read files with appropriate import function
-        elif paths[0].endswith(spm_ext):
-            data = read_spm(paths)
-        elif paths[0].endswith(sts_ext):
-            data = read_spectra(paths, signal)
+    # Check if any files were found
+    if len(paths) == 0:
+        raise ValueError(FILES_NOT_FOUND_ERROR)
+    
+    # read files with appropraite import function
+    for path in paths: 
+        if path.endswith(".sxm"):
+            images = list(map(read_sxm, paths))
+        elif path.endswith(".Z_mtrx"):
+            images = list(map(read_mtrx, paths))
         else:
-            raise ValueError(FILETYPE_ERROR)
+            raise ValueError(FILETYPE_ERROR)           
 
-        return data, paths
+    return images
     
 def export_spm(images, dst_paths = ['./'], ext = 'jpeg', 
                scan_dir = 'up', cmap = 'gray'):
