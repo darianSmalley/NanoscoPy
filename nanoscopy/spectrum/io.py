@@ -121,8 +121,6 @@ def read(path, filter = '', signal = None):
     Outputs:
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    spm_ext = tuple(['.sxm', '.Z_mtrx'])
-
     # Check if path leads to a file or a folder
     if os.path.isfile(path):
         # If file ends with supported spm file extension,
