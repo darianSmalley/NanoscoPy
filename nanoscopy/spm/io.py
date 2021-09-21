@@ -6,7 +6,7 @@ import pySPM
 import access2thematrix
 import matplotlib.pyplot as plt
 from pathlib import Path
-import SPMimage
+from . import SPMimage
 
 FILES_NOT_FOUND_ERROR = "No files found."
 FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat, sxm, Z_mtrx, and 3ds are supported."
