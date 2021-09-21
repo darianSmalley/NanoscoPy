@@ -1,11 +1,18 @@
-class SPMImage:
-    def __init__(self, path=''):
-        self.path = path
-        self.data = dict()
-        self.parameters = dict()
-    
-    def add_data(self , data , channel_name , direction = 'Forward'):
-        if channel_name not in self.data.keys():
-            self.data[channel_name] = {'Forward': None , 'Backward': None }
+CHANNEL_ERROR = 'Channel not supported.'
+DIRECTION_ERROR = 'Direction not supported.'
 
-        self.data[channel_name][direction] = data
+class SPMImage:
+    traces = ['forward/up', 'forward/down', 'backward/up', 'backward/down']
+    channels = ['Z' , 'Current', 'Amplitude']
+
+    def __init__(self, path='', *args, **kwargs):
+        self.path = path
+        self.params = dict()
+        self.data = dict()
+    
+    def add_data(self, data, channel_name = 'Z', trace = 'forward/up'):
+        if trace not in traces: 
+            raise ValueError(DIRECTION_ERROR)
+
+        self.data[channel_name].append({trace: data})
+    

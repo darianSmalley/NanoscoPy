@@ -30,20 +30,22 @@ def read_sxm(path):
         # Create SPMImage class object
         image = SPMimage(path)
 
+        # Add records of important scan parameters
+        direction = sxm.header['SCAN_DIR'][0][0]
+        image.params['bias'] = float(sxm.header['Bias>Bias (V)'][0][0])
+        image.params['setpoint_value'] = float(sxm.header['Z-CONTROLLER'][1][3])
+        image.params['setpoint_unit'] = sxm.header['Z-CONTROLLER'][1][4]
+        image.params['direction'] = direction
+        image.params['width'] = sxm.size['real']['x']
+        image.params['height'] = sxm.size['real']['y']
+
         # Get data and store in SPMImage class
         for channel in ['Z' , 'Current']:
-            im_forward = sxm.get_channel(channel , direction = 'forward').pixels
-            im_backward = sxm.get_channel(channel , direction = 'backward').pixels
+            im_forward = sxm.get_channel(channel , trace = 'forward').pixels
+            im_backward = sxm.get_channel(channel , trace = 'backward').pixels
 
-            image.add_data(im_forward , channel , 'Forward')
-            image.add_data(im_backward , channel , 'Backward')
-
-        # Add records of important scan parameters
-        image.parameters['bias'] = float(sxm.header['Bias>Bias (V)'][0][0])
-        image.parameters['setpoint_value'] = float(sxm.header['Z-CONTROLLER'][1][3])
-        image.parameters['setpoint_unit'] = sxm.header['Z-CONTROLLER'][1][4]
-        image.parameters['width'] = sxm.size['real']['x']
-        image.parameters['height'] = sxm.size['real']['y']
+            image.add_data(im_forward , channel , f'forward/{direction}')
+            image.add_data(im_backward , channel , f'backward/{direction}')
 
         # Close the sxm file
         sxm.closefile() # Note: This method is from our modified version of SXM
@@ -72,12 +74,6 @@ def read_mtrx(path):
          # Create SPMImage class object
         image = SPMimage(path)
 
-        # Get data and store in SPMImage class
-        for trace in traces:
-            trace_image, message = mtrx.select_image(trace)
-            trace_data = trace_image.data[~np.isnan(image.data)]
-            image.add_data(trace_data , trace , 'Forward')
-
         # Retreive records of important scan parameters
         setpoint, setpoint_unit = mtrx.param['EEPA::Regulator.Setpoint_1']
         voltage, _ = mtrx.param['EEPA::GapVoltageControl.Voltage']
@@ -85,11 +81,17 @@ def read_mtrx(path):
         scan_height, _ = mtrx.param['EEPA::XYScanner.Height']
 
         # Add important scan parameters to SPMimage
-        image.parameters['setpoint_value'] = setpoint
-        image.parameters['setpoint_unit'] = setpoint_unit
-        image.parameters['bias'] = voltage
-        image.parameters['width'] = scan_width
-        image.parameters['height'] = scan_height
+        image.params['setpoint_value'] = setpoint
+        image.params['setpoint_unit'] = setpoint_unit
+        image.params['bias'] = voltage
+        image.params['width'] = scan_width
+        image.params['height'] = scan_height
+
+        # Get data and store in SPMImage class
+        for trace in traces:
+            trace_image, message = mtrx.select_image(trace)
+            trace_data = trace_image.data[~np.isnan(image.data)]
+            image.add_data(trace_data , 'Z', trace)
 
         return image
 
