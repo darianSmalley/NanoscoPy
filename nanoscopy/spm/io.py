@@ -78,6 +78,8 @@ def read_mtrx(path):
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
     try: 
+        # TODO: check if path has extension and remove it
+
         # Get I and Z mtrx file paths for this image.   
         Z_path = f'{path}.Z_mtrx'
         I_path = f'{path}.I_mtrx'
