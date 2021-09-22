@@ -117,8 +117,8 @@ def read_mtrx(path):
                 
                 for index, raster in rasters.items():
                     mtrx_image, message = mtrx.select_image(raster)
-                    data = mtrx_image.data[~np.isnan(mtrx_image.data)]
-                    image.add_data(channel, data)
+                    # data = mtrx_image.data[~np.isnan(mtrx_image.data)]
+                    image.add_data(channel, mtrx_image.data)
                     
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)

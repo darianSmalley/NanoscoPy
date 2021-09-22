@@ -28,7 +28,7 @@ class SPMImage(MutableMapping):
         self.traces[channel].append({'direction': direction, 'trace': trace})
 
     def get_data(self, channel):
-        return zip(self.traces[channel], self.data[channel])
+        return dict(zip(self.traces[channel], self.data[channel]))
     
     def set_headers(self, headers):
         self.headers = headers
