@@ -7,6 +7,7 @@ class SPMImage(MutableMapping):
     def __init__(self, path='', *args, **kwargs):
         self.path = path
         self.params = dict()
+        self.headers = dict()
         self.data = {'Z':[], 'Current':[]}
         self.traces = {'Z':[], 'Current':[]}
         self.update(*args, **kwargs)
@@ -28,6 +29,9 @@ class SPMImage(MutableMapping):
 
     def get_data(self, channel):
         return zip(self.traces[channel], self.data[channel])
+    
+    def set_headers(self, headers):
+        self.headers = headers
 
     # The next five methods are requirements of the collection
     def __setitem__(self, key, value):

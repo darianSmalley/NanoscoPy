@@ -49,7 +49,7 @@ def read_sxm(path):
         image.add_param('height', height)
         image.add_param('channels', channels)
         image.add_param('scan_direction', scan_direction)
-        image.add_param('headers', sxm.header)
+        image.set_headers(sxm.header)
 
         # Get data and store in SPMImage class
         for channel in CHANNELS:
@@ -113,7 +113,7 @@ def read_mtrx(path):
                 image.add_param('bias', voltage)
                 image.add_param('width', scan_width)
                 image.add_param('height', scan_height)
-                image.add_param('headers', mtrx.param)
+                image.set_headers(mtrx.param)
                 
                 for index, raster in rasters.items():
                     mtrx_image, message = mtrx.select_image(raster)
