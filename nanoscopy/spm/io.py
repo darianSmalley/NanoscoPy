@@ -31,9 +31,6 @@ def read_sxm(path):
         # Open SXM file
         sxm = pySPM.SXM(path)
 
-        # Create SPMImage class object
-        image = SPMImage(path)
-        # pprint.pprint(sxm.header)
         # Add records of important scan parameters
         channels = sxm.header['Scan>channels'][0]
         scan_direction = sxm.header['SCAN_DIR'][0][0]
@@ -43,7 +40,8 @@ def read_sxm(path):
         width = sxm.size['real']['x']
         height = sxm.size['real']['y']
 
-
+        # Create SPMImage class object
+        image = SPMImage(path)
         image.add_param('bias', bias)
         image.add_param('setpoint_value', setpoint_value)
         image.add_param('setpoint_unit', setpoint_unit) 
@@ -79,7 +77,6 @@ def read_mtrx(path):
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    print(path)
     try: 
         # Get I and Z mtrx file paths for this image.   
         Z_path = f'{path}.Z_mtrx'
@@ -90,7 +87,8 @@ def read_mtrx(path):
         }
         
         print('Found the following mtrx files in path:')
-        print(mtrx_channels)
+        pprint.pprint(mtrx_channels)
+        print(f'Processing {Path(path).stem}...', end="", flush=True)
 
         # Create SPMImage class object
         image = SPMImage(path)
@@ -98,7 +96,6 @@ def read_mtrx(path):
         # Get data and store in SPMImage class
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
-                print(f'Processing {channel_path[-20:]}...', end="", flush=True)
             
                 # Create mtrx class to access data
                 mtrx = access2thematrix.MtrxData()    
@@ -125,9 +122,8 @@ def read_mtrx(path):
                     
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)
-
-            print('DONE')
-        
+            
+        print('DONE')
         return image
 
     except Exception as error:
