@@ -7,18 +7,24 @@ class SPMImage(MutableMapping):
     def __init__(self, path='', *args, **kwargs):
         self.path = path
         self.params = dict()
-        self.data = dict()
-        self.traces = dict()
+        self.data = {'Z':[], 'Current':[]}
+        self.traces = {'Z':[], 'Current':[]}
         self.update(*args, **kwargs)
     
+    def add_param(self, param, value):
+        self.params[param] = value
+
     def add_data(self, channel, data):
+        if channel not in self.data:
+            self.data[channel] = []
+
         self.data[channel].append(data)
         
     def add_trace(self, channel, direction, trace):
-        self.traces[channel].append({'direction': direction, 'trace': trace})
+        if channel not in self.data:
+            self.traces[channel] = []
 
-    def add_param(self, param, value):
-        self.params[param] = value
+        self.traces[channel].append({'direction': direction, 'trace': trace})
 
     def get_data(self, channel):
         return zip(self.traces[channel], self.data[channel])
@@ -38,8 +44,8 @@ class SPMImage(MutableMapping):
     # The final two methods aren't required, but nice for demo purposes:
     def __str__(self):
         '''returns simple dict representation of the mapping'''
-        return str(self.data)
+        return ', '.join("%s: %s" % item for item in vars(self).items())
     def __repr__(self):
         '''echoes class, id, & reproducible representation in the REPL'''
-        return '{}, D({})'.format(super(SPMImage, self).__repr__(), 
+        return '{}, SPMImage({})'.format(super(SPMImage, self).__repr__(), 
                                   self.data)        
