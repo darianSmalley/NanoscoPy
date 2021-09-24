@@ -1,6 +1,7 @@
 import os
 import glob
 import numpy as np
+from datetime import datetime
 import pandas as pd
 import pySPM
 import access2thematrix
@@ -40,6 +41,12 @@ def read_sxm(path):
         width = sxm.size['real']['x']
         height = sxm.size['real']['y']
 
+        # Get and convert date/time stamp
+        date = sxm.header['REC_DATE'][0][0]
+        time = sxm.header['REC_TIME'][0][0]
+        datetime_string = date + ' ' + time
+        datetime_object = datetime.strptime(datetime_string, '%d.%m.%Y %H:%M:%S')
+
         # Create SPMImage class object
         image = SPMImage(path)
         image.add_param('bias', bias)
@@ -49,6 +56,7 @@ def read_sxm(path):
         image.add_param('height', height)
         image.add_param('channels', channels)
         image.add_param('scan_direction', scan_direction)
+        image.add_param('date_time' , datetime_object)
         image.set_headers(sxm.header)
 
         # Get data and store in SPMImage class
@@ -110,20 +118,25 @@ def read_mtrx(path):
                 scan_width, _ = mtrx.param['EEPA::XYScanner.Width']
                 scan_height, _ = mtrx.param['EEPA::XYScanner.Height']
 
+                # Get and convert date/time stamp
+                datetime_string = mtrx.param['BKLT']
+                datetime_object = datetime.strptime(datetime_string, '%A, %d %B %Y %H:%M:%S')
+
                 # Add important scan parameters to SPMimage
                 image.add_param('setpoint_value', setpoint)
                 image.add_param('setpoint_unit', setpoint_unit)
                 image.add_param('bias', voltage)
                 image.add_param('width', scan_width)
                 image.add_param('height', scan_height)
+                image.add_param('date_time' , datetime_object)
                 image.set_headers(mtrx.param)
                 
                 for _, raster in rasters.items():
                     mtrx_image, message = mtrx.select_image(raster)
                     print(message)
                     
-                    nan_mask = ~np.isnan(mtrx_image)
-                    mtrx_image = np.where(nan_mask, mtrx_image, 0)
+                    nan_mask = ~np.isnan(mtrx_image.data)
+                    mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
                     image.add_data(channel, mtrx_image.data)
                     
                     trace, direction = raster.split('/')
