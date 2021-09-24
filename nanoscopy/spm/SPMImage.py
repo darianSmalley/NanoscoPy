@@ -18,7 +18,7 @@ class SPMImage(MutableMapping):
     def add_data(self, channel, data):
         if channel not in self.data:
             self.data[channel] = []
-        print(data.shape)
+            
         self.data[channel].append(data)
         
     def add_trace(self, channel, direction, trace):
