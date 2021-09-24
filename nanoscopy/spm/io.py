@@ -55,7 +55,8 @@ def read_sxm(path):
         for channel in CHANNELS:
             for trace in TRACES:
                 data = sxm.get_channel(channel, direction = trace).pixels
-                data = data[~np.isnan(data)]
+                nan_mask = ~np.isnan(data)
+                data = np.where(nan_mask, data, 0)
                 image.add_data(channel, data)
                 image.add_trace(channel, scan_direction, trace)
 
@@ -117,9 +118,12 @@ def read_mtrx(path):
                 image.add_param('height', scan_height)
                 image.set_headers(mtrx.param)
                 
-                for index, raster in rasters.items():
+                for _, raster in rasters.items():
                     mtrx_image, message = mtrx.select_image(raster)
-                    # data = mtrx_image.data[~np.isnan(mtrx_image.data)]
+                    print(message)
+                    
+                    nan_mask = ~np.isnan(mtrx_image)
+                    mtrx_image = np.where(nan_mask, mtrx_image, 0)
                     image.add_data(channel, mtrx_image.data)
                     
                     trace, direction = raster.split('/')
