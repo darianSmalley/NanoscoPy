@@ -49,26 +49,28 @@ class PlotGen():
         """
         Plot the data using the Ishigami group 'default' style
         """
-        #### Add data to the axes ####
-        # Make the base plot the data
-        # Case for a single set of data
-        if isinstance(self.data[0] , np.ndarray):
-            self.ax.plot(self.data[0] * self.scale_factors[0] , self.data[1] * self.scale_factors[1])
-        # Case for multiple sets of data
-        elif isinstance(self.data , list):
-            for curve_data in self.data:
-                self.ax.plot(curve_data[0] * self.scale_factors[0] , curve_data[1] * self.scale_factors[1])
-        
-        # Apply specified axis labels (if applicable)
-        if self.axis_labels != None:
-            self.ax.set(**self.axis_labels)
-        
-        # Apply a legend (if applicable)
-        self.update_legend()
-        
-        # Adjust ticks and tick labels
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to x axis
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to y axis
+        # Use the specified
+        with plt.style.context(self.plot_styles):
+            #### Add data to the axes ####
+            # Make the base plot the data
+            # Case for a single set of data
+            if isinstance(self.data[0] , np.ndarray):
+                self.ax.plot(self.data[0] * self.scale_factors[0] , self.data[1] * self.scale_factors[1])
+            # Case for multiple sets of data
+            elif isinstance(self.data , list):
+                for curve_data in self.data:
+                    self.ax.plot(curve_data[0] * self.scale_factors[0] , curve_data[1] * self.scale_factors[1])
+            
+            # Apply specified axis labels (if applicable)
+            if self.axis_labels != None:
+                self.ax.set(**self.axis_labels)
+            
+            # Apply a legend (if applicable)
+            self.update_legend()
+            
+            # Adjust ticks and tick labels
+            self.ax.xaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to x axis
+            self.ax.yaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to y axis
     
     ##### Convenience Functions ######
     def update_legend(self):

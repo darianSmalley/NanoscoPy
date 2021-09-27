@@ -1,5 +1,5 @@
 # Custom plot style
-#axes.prop_cycle: cycler('color', ['0072B2', '009E73', 'D55E00', 'CC79A7', 'F0E442', '56B4E9'])
+axes.prop_cycle: cycler('color', ['0072B2', '009E73', 'D55E00', 'CC79A7', 'F0E442', '56B4E9'])
 
 ## ***************************************************************************
 ## * FIGURE                                                                  *
@@ -13,12 +13,11 @@ figure.autolayout: False  # When True, automatically adjust subplot
 ## ***************************************************************************
 ## * Fonts                                                                   *
 ## ***************************************************************************
-axes.labelsize:     20  # font size of the x and y labels
-axes.titlesize:     20   # font size of the axes title
-xtick.labelsize:     16  # font size of the tick labels
-ytick.labelsize:     16  # font size of the tick labels
-#legend.fontsize:      10  # font size of the legend entries
-legend.fontsize: 30
+axes.labelsize:     22  # font size of the x and y labels
+axes.titlesize:     22   # font size of the axes title
+xtick.labelsize:     20  # font size of the tick labels
+ytick.labelsize:     20  # font size of the tick labels
+legend.fontsize:      18  # font size of the legend entries
 
 ## ***************************************************************************
 ## * GRIDS                                                                   *
@@ -45,4 +44,4 @@ ytick.direction:     in     # direction: {in, out, inout}
 ytick.major.left:    True    # draw y axis left major ticks
 ytick.major.right:   True    # draw y axis right major ticks
 
-lines.linewidth : 2.0
+lines.linewidth :   3.0
