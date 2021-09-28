@@ -5,75 +5,89 @@ import numpy as np
 import os
 
 class PlotGen():
-    def __init__(self , data , data_labels = None , axis_labels = None , scale_factors = None):
+    def __init__(self , data , data_labels = None , axis_labels = None , scale_factors = None , plot_styles = 'default'):
         """
-        data: Numpy array of 2-column Numpy containing one sub-array representing each curve to be plotted. The first column of each subarray should be the X axis data and the second the Y axis data.
-        data_labels: Numpy array of strings. Used to specify legend entries for plotted curves.
+        data: Numpy array or list of 2-column Numpy arrays containing one sub-array representing each curve to be plotted. The first column of each subarray should be the X axis data and the second the Y axis data.
+        data_labels: String or list of strings. Used to specify legend entries for plotted curves.
         axis_labels: Dictionary. Should contain key:value pairs including either or both of the following: 'xlabel':'X Axis Title' , 'ylabel':'Y Axis Title'
         scale_factors: List. Should contain two numbers which represent the factors by which the X and Y values of data should be scaled by before plotting. This is useful for converting between units on plots.
+        plot_styles: string or list of strings. The strings should be either names of stylesheets present in the Matplotlib directory or a full path to a stylesheet in another location.
         """
         # Define inputs as class properties for later use
         self.data = data
         self.data_labels = data_labels
         self.axis_labels = axis_labels
-        # Initialize matplotlib figure and axes objects
-        self.fig , self.ax = plt.subplots()
+        self.plot_styles = plot_styles
+        
+        # Initialize matplotlib figure and axes objects using specified matplotlib stylesheet(s)
+        with plt.style.context(self.plot_styles):
+            self.fig , self.ax = plt.subplots()
+        
         # Construct a plot from the data inputs using the 'default' style
         self.set_scalefactors(scale_factors)
         self.plot_default()
     
     def set_scalefactors(self, scale_factors):
         """
-        Determine whether there should be a scale factor for us in plotting.
+        Sets scale factors by which data for plotting is multiplied. This might be useful when plotting very large or very small quantities.
+        
+        Input:
+            scale_factors: list of floats (should be of length 2) or None.
+                If scale_factors is None: no scaling occurs.
+                If scale_factors is a 2-element list of floats: X axis data is multiplied by the first element and the Y data is multiplied by the second.
         """
+        # Check to see if a list of scale factors is provided.
         if isinstance(scale_factors , list):
+            # Make sure that the elements are suitable for multiplication
             if isinstance(scale_factors[0] , (int , float)):
+                # Store the scale factors as an attribute.
                 self.scale_factors = scale_factors[:2]
         else:
+            # If the provided scale factors are unsuitable, set them to 1 and thus not scale the data.
             self.scale_factors = [1,1]
     
     def plot_default(self):
         """
         Plot the data using the Ishigami group 'default' style
         """
-        #### Add data to the axes ####
-        # Make the base plot the data
-        # Case for a single set of data
-        if isinstance(self.data[0] , np.ndarray):
-            self.ax.plot(self.data[0] * self.scale_factors[0] , self.data[1] * self.scale_factors[1] , 'o-')
-        # Case for multiple sets of data
-        elif isinstance(self.data[0] , list):
-            for curve_data in self.data:
-                self.ax.plot(curve_data[0] * self.scale_factors[0] , curve_data[1] * self.scale_factors[1] , 'o-')
-        
-        # Apply specified axis labels (if applicable)
-        if self.axis_labels != None:
-            self.ax.set(**self.axis_labels)
-        
-        # Create/update the legend (if applicable)
-        self.update_legend()
-        
-        #### Adjust styles of the plot to the Ishigami Group 'default' ####
-        self.fig.set_size_inches(8,6)
-        self.ax.grid(linestyle = '--' , alpha=0.5)
-        
-        # Adjust ticks and tick labels
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to x axis
-        self.ax.yaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to y axis
-        self.ax.tick_params(which = 'both',bottom = True , top = True , left = True , right = True) # Add ticks to top and right spines
-        self.ax.tick_params(which='both', direction='in', labelsize=16) # Adjust tick appearance
-        self.ax.xaxis.label.set_size(20)
-        self.ax.yaxis.label.set_size(20)
-        
+        # Use the specified
+        with plt.style.context(self.plot_styles):
+            #### Add data to the axes ####
+            # Make the base plot the data
+            # Case for a single set of data
+            if isinstance(self.data[0] , np.ndarray):
+                self.ax.plot(self.data[0] * self.scale_factors[0] , self.data[1] * self.scale_factors[1])
+            # Case for multiple sets of data
+            elif isinstance(self.data , list):
+                for curve_data in self.data:
+                    self.ax.plot(curve_data[0] * self.scale_factors[0] , curve_data[1] * self.scale_factors[1])
+            
+            # Apply specified axis labels (if applicable)
+            if self.axis_labels != None:
+                self.ax.set(**self.axis_labels)
+            
+            # Apply a legend (if applicable)
+            self.update_legend()
+            
+            # Adjust ticks and tick labels
+            self.ax.xaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to x axis
+            self.ax.yaxis.set_minor_locator(AutoMinorLocator()) # Add minor ticks to y axis
+    
+    ##### Convenience Functions ######
     def update_legend(self):
         # Create/update the legend (if applicable)
         if self.data_labels != None:
+            # The case for only one curve.
             if isinstance(self.data_labels , str):
+                # Get the curve object from the plot and assign the label to it
                 self.ax.get_lines()[0].set_label(self.data_labels)
             elif isinstance(self.data_labels , list):
+                # The case for multiple curves on a single plot.
+                # Get a list of curves and assign labels to them one at a time.
                 for index , line in enumerate(self.ax.get_lines()):
                     line.set_label(self.data_labels[index])
-            self.ax.legend(fontsize = 16)
+            # Update the legend with the new data labels
+            self.ax.legend()
             
     def update_linestyles(self, linestyles):
         """
@@ -108,12 +122,16 @@ class PlotGen():
         self.update_legend()
     
     def export_fig(self , output_path):
+        """
+        output_path: string. Specifies the path to which the figure will be exported. The path must include a filename and valid image extension.
+
+        Saves the figure in the PlotGen object to a file. 
+        """
         self.fig.set_tight_layout(True)
         self.fig.savefig( output_path , facecolor = 'white', transparent=False)
 
 #######################################################
 ########### Notes for improving PlotGen ###############
-# Look into the Matplotlib Styles functionality and make sure that this class is still sensible.
 # Add the ability to supply PlotGen with the fig , ax of an existing plot and then have it update the style of the existing plot in place.
 # Encapsulate more of the plot_default actions into separate methods to facilitate plot updates in addition to plot creation.
 
