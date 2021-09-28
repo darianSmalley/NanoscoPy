@@ -1,5 +1,6 @@
 import os
 from shutil import copy2
+from tkinter import Tk, filedialog, Label
 
 def pad_filename_with_zeros(filepath, file_index_delim = '_' , pad_digits = 4):
     """
@@ -56,17 +57,28 @@ def sort_data_ascending(data, indep_variable_name):
         data.reset_index(inplace = True, drop = True) # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
     return data
 
-def convert_string_to_enot(num_string , sig_digits = 3):
+def dialog_askdirectory():
     """
-    Converts a string containing a number expressed in E-notation to a float.
-    
-    Inputs:
-        num_string: string. String containing characters for E-notation number.
-        sig_digits: int. The number of significant digits in the E-notation form of the number.
-    
-    Outputs:
-        Number as a float
+    Prompts the user to select a directory and returns the path for that directory.
+
+    Output:
+        folder_path: string. The full path to the selected directory.
     """
-    magnitude = float(num_string[:sig_digits])
-    order_of_magnitude = int(num_string[-1:])
-    return magnitude * 10**order_of_magnitude
+    root = Tk()
+    Label(root, text="Select data folder")
+    folder_path = filedialog.askdirectory()
+    root.destroy()
+    return folder_path
+
+def dialog_askfilename():
+    """
+    Prompts the user to select a file and returns the path for that file.
+
+    Output:
+        file_path: string. The full path to the selected file.
+    """
+    root = Tk()
+    Label(root, text="Select data folder")
+    file_path = filedialog.askopenfilename() 
+    root.destroy()
+    return  file_path
