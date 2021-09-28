@@ -11,6 +11,7 @@ class PlotGen():
         data_labels: String or list of strings. Used to specify legend entries for plotted curves.
         axis_labels: Dictionary. Should contain key:value pairs including either or both of the following: 'xlabel':'X Axis Title' , 'ylabel':'Y Axis Title'
         scale_factors: List. Should contain two numbers which represent the factors by which the X and Y values of data should be scaled by before plotting. This is useful for converting between units on plots.
+        plot_styles: string or list of strings. The strings should be either names of stylesheets present in the Matplotlib directory or a full path to a stylesheet in another location.
         """
         # Define inputs as class properties for later use
         self.data = data
@@ -76,11 +77,16 @@ class PlotGen():
     def update_legend(self):
         # Create/update the legend (if applicable)
         if self.data_labels != None:
+            # The case for only one curve.
             if isinstance(self.data_labels , str):
+                # Get the curve object from the plot and assign the label to it
                 self.ax.get_lines()[0].set_label(self.data_labels)
             elif isinstance(self.data_labels , list):
+                # The case for multiple curves on a single plot.
+                # Get a list of curves and assign labels to them one at a time.
                 for index , line in enumerate(self.ax.get_lines()):
                     line.set_label(self.data_labels[index])
+            # Update the legend with the new data labels
             self.ax.legend()
             
     def update_linestyles(self, linestyles):
@@ -116,6 +122,11 @@ class PlotGen():
         self.update_legend()
     
     def export_fig(self , output_path):
+        """
+        output_path: string. Specifies the path to which the figure will be exported. The path must include a filename and valid image extension.
+
+        Saves the figure in the PlotGen object to a file. 
+        """
         self.fig.set_tight_layout(True)
         self.fig.savefig( output_path , facecolor = 'white', transparent=False)
 
