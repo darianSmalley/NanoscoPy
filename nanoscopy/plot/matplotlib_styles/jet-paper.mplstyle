@@ -1,47 +1,31 @@
 # Custom plot style
-axes.prop_cycle: cycler('color', ['0072B2', '009E73', 'D55E00', 'CC79A7', 'F0E442', '56B4E9'])
 
 ## ***************************************************************************
 ## * FIGURE                                                                  *
 ## ***************************************************************************
 figure.figsize:     8, 6  # figure size in inches
-figure.facecolor:   white     # figure face color
-figure.autolayout: False  # When True, automatically adjust subplot
-                           # parameters to make the plot fit the figure
-                           # using `tight_layout`
 
 ## ***************************************************************************
 ## * Fonts                                                                   *
 ## ***************************************************************************
-axes.labelsize:     x-large  # font size of the x and y labels
-axes.titlesize:     x-large   # font size of the axes title
-xtick.labelsize:     large  # font size of the tick labels
-ytick.labelsize:     large  # font size of the tick labels
-legend.fontsize:      medium  # font size of the legend entries
+axes.labelsize:     22  # font size of the x and y labels
+axes.titlesize:     22   # font size of the axes title
+xtick.labelsize:     20  # font size of the tick labels
+ytick.labelsize:     20  # font size of the tick labels
+legend.fontsize:      18  # font size of the legend entries
 
 ## ***************************************************************************
 ## * GRIDS                                                                   *
 ## ***************************************************************************
-axes.grid:          True   # display grid or not
-axes.grid.axis:     both    # which axis the grid should apply to
-axes.grid.which:    major   # grid lines at {major, minor, both} ticks
-grid.linestyle: --       # dashed
 grid.linewidth: 0.8     # in points
-grid.alpha:     0.5     # transparency, between 0.0 and 1.0
 
 ## ***************************************************************************
 ## * TICKS                                                                   *
 ## ***************************************************************************
 xtick.major.width:   0.8     # major tick width in points
 xtick.minor.width:   0.6     # minor tick width in points
-xtick.direction:     in     # direction: {in, out, inout}
-xtick.major.top:     True    # draw x axis top major ticks
-xtick.major.bottom:  True    # draw x axis bottom major ticks
 
 ytick.major.width:   0.8     # major tick width in points
 ytick.minor.width:   0.6     # minor tick width in points
-ytick.direction:     in     # direction: {in, out, inout}
-ytick.major.left:    True    # draw y axis left major ticks
-ytick.major.right:   True    # draw y axis right major ticks
 
 lines.linewidth :   3.0
