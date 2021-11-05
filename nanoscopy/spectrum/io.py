@@ -17,7 +17,7 @@ def determine_metadata_lines(path, source = 'Nanonis'):
     Outputs:
         metadata_end: int. Specifies the row index corresponding to the end of the metadata at the beginnong of the data file.
     """
-    if source == 'Nanonis':
+    if source in ['Nanonis', 'Ishigami']:
         # Determine if the path was specified as a list of path snipets
         if isinstance(path, list): 
             # Use list unpacking to separate elements into multiple arguments, then join them into a proper path.
@@ -28,9 +28,15 @@ def determine_metadata_lines(path, source = 'Nanonis'):
         
         # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
         metadata_end = data_column[ data_column[0] == "[DATA]"].index[0]
+    
     return metadata_end
 
-def read_spectrum(path, signal = None):
+def get_metadata(path, metadata_end, source = 'Nanonis'):
+    if source == 'Ishigami':
+        metadata = pd.read_csv(path , sep = '\t' , usecols = [0,1] , names = ['Property','Value'], skiprows = 1, nrows = metadata_end - 1)
+    return metadata
+
+def read_spectrum(path, signal = None, source = 'Nanonis', return_metadata = False):
     """
     Imports tabular data from a text file.
 
@@ -54,6 +60,9 @@ def read_spectrum(path, signal = None):
     if signal: 
         data = data.sort_values(by=[signal])
 
+    if return_metadata == True:
+        metadata = get_metadata(path, metadata_end, source = source)
+        return data , metadata
     return data
 
 def read_spectra(paths, signal = None):
