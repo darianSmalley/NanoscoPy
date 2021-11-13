@@ -2,6 +2,7 @@ import numpy as np
 import spiepy
 from pathlib import Path
 import cv2
+import matplotlib.pyplot as plt
 
 def line_flatten(image):
     image = np.array(image)
@@ -135,3 +136,104 @@ def subtract_poly1D_line(image , poly_order = 2, mask = None , axis = 'x'):
         background_image = background_image.transpose()
 
     return image_subtracted , background_image
+
+def create_mask(image, mask_method = 'mask_by_mean'):
+    """
+    Creates a mask to exclude certain parts of an image. This can be useful for excluding troublesome sections of an image during flattening.
+
+    Inputs:
+        image: Numpy array. Contains the image to be masked.
+    
+    Outputs:
+        mask: Numpy array. Contains a mask for an image. Pixels which are masked will be excluded by SPIEPy's levelling functions.
+    """
+    # Convert Numpy array image to SPIEPy image format.
+    im = spiepy.Im()
+    im.data = image
+
+    # Create an image mask using one of SPIEPy's built-in methods.
+    if mask_method == 'mean':
+        # Use this if this if there is contamination, but no atomic resolution
+        mask = spiepy.mask_by_mean(im)
+    elif mask_method == 'peak-trough':
+        # Use this if there is a fair amount of contamination in the imge, but also atomic resolution
+        mask , _ = spiepy.mask_by_troughs_and_peaks(im)
+    elif mask_method == 'step':
+        # Use this if there are step edges in the image
+        mask = spiepy.locate_steps(im, 4)
+    else:
+        print('Unknown masking type.')
+        mask = 'NaN'
+    return mask
+
+def plot_masked_image(image, mask):
+    """
+    Shows an image with a pixel mask overlaid. If the mask was generated using SPIEPy functionality, the masked pixels will correspond to those which fail to meet some criteria.
+
+    Inputs:
+        image: Numpy array. Contains the image to be masked.
+        mask: Numpy array. Contains a mask for an image. Pixels which are masked will be excluded by SPIEPy's levelling functions.
+    """
+    # Make a masked array, to visualize the mask superimposed over the image
+    masked_image = np.ma.array(image, mask = mask)
+    palette = spiepy.NANOMAP
+    palette.set_bad('#00ff00', 1.0)
+    # Show the masked image
+    plt.imshow(masked_image, cmap = spiepy.NANOMAP, origin = 'lower')
+
+def plot_mask_comparison(im_unleveled , mask , im_leveled , titles = ['Masked Image' , 'Leveled Image']):
+    """
+    Creates a figure showing both the original image and a masked version of the image. 
+    
+    Inputs:
+        im_unleveled: Numpy array. Contains the image to be masked.
+        mask: Numpy array. Contains the pixel mask.
+        im_leveled: Numpy array. Contains the image after levelling has been performed.
+        titles: list of strings. Should have exactly two elements, corresponding to the desired titles for the images.
+    
+    Outputs:
+        fig: Matplotlib Figure object. Contains information about the compound figure.
+        ax1, ax2: Matplotlib Axis objects. Contains info about the images for the compound figure.
+    """
+    # Generate masked image of unleveled image
+    masked_image = np.ma.array(im_unleveled.data, mask = mask)
+    palette = spiepy.NANOMAP
+    palette.set_bad('#00ff00', 1.0)
+    
+    # Generate a subplot figure for plotting.
+    fig , (ax1 , ax2) =  plt.subplots(1, 2)
+    
+    # Plot the masked image on the subplot figure
+    ax1.imshow(masked_image, cmap = spiepy.NANOMAP, origin = 'lower')
+    ax1.set_title(titles[0])
+    # Plot the leveled image on the subplot figure
+    ax2.imshow(im_leveled.data, cmap = spiepy.NANOMAP, origin = 'lower')
+    ax2.set_title(titles[1])
+
+    return fig , (ax1 , ax2)
+
+def terrace_level(image):
+    """
+    Attempts to level an image by finding terraces in the image and calculating the needed transform to make the terraces level on the average.
+    
+    Inputs:
+        image: Numpy array. Contains the image to be masked.
+    
+    Outputs:
+        Numpy array. Levelled image.
+    """
+    # Convert Numpy array image to SPIEPy image format.
+    im = spiepy.Im()
+    im.data = image
+
+    # Pre-flatten the image using a plane fit to remove large-scale tilt in the image.
+    im_preflat, _ = spiepy.flatten_xy(im)
+
+    # Locate the step
+    mask_step = create_mask(im_preflat, mask_method = 'step')
+
+    # Flatten the image, taking the step into account
+    im_leveled_step, _ = spiepy.flatten_xy(im, mask_step)
+    
+    # Return the flattened image as a Numpy Array.
+    return im_leveled_step.data
