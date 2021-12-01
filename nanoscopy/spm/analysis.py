@@ -134,3 +134,27 @@ def fit_HHCF_short_range(HHCF_data , parameter_guesses = None):
         return result
     except:
         print('There was an issue processing the data.')
+
+def make_histogram(image, num_bins = 100):
+    """
+    Bin a collection of numeric data for use in histogram plotting or analysis.
+
+    Inputs:
+        image: Numpy array. Contains the data to be binned.
+        num_bins: int. Specifies the number of bins to use.
+    
+    Outputs:
+        bin_centers: Float. The center coordinate for the histogram bins.
+        counts: Int. The number of data points contained in each bin.
+        bin_width: Float. The width of the bins.
+    """
+    # Group data into desired number of bins.
+    counts , bin_edges = np.histogram(image , bins = num_bins)
+
+    # calculate the center values for the bins
+    bin_centers = 0.5*(bin_edges[1:] + bin_edges[:-1])
+
+    # calculate the width of the bins.
+    bin_width = (bin_edges[-1]-bin_edges[0])/len(counts)
+    return bin_centers, counts, bin_width
+    
