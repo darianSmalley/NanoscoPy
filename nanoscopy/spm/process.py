@@ -163,7 +163,7 @@ def create_mask(image, mask_method = 'mask_by_mean'):
         mask = spiepy.locate_steps(im, 4)
     else:
         print('Unknown masking type.')
-        mask = 'NaN'
+        mask = np.zeros_like(image)
     return mask
 
 def plot_masked_image(image, mask):
@@ -230,7 +230,7 @@ def terrace_level(image):
     im_preflat, _ = spiepy.flatten_xy(im)
 
     # Locate the step
-    mask_step = create_mask(im_preflat, mask_method = 'step')
+    mask_step = create_mask(im_preflat.data, mask_method = 'step')
 
     # Flatten the image, taking the step into account
     im_leveled_step, _ = spiepy.flatten_xy(im, mask_step)
