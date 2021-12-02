@@ -2,7 +2,7 @@
 An open source repo for the analysis of experimental microscopy data common in materials and surface science.
 
 ## Example Usage
-`
+```
     import nanoscopy as nano
     import matplotlib.pyplot as plt
 
@@ -20,4 +20,4 @@ An open source repo for the analysis of experimental microscopy data common in m
 
     # Show flattened image 
     plt.imshow(flattened_image)
-`
+```
