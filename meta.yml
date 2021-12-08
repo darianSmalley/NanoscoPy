@@ -1,0 +1,50 @@
+{% set name = "NanoscoPy" %}
+{% set version = "0.0.7" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  git_rev: "{{ version }}"
+  git_url: https://github.com/darianSmalley/NanoscoPy.git
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+
+requirements:
+  host:
+    - pip
+    - python
+    - setuptools
+  run:
+    - python >= 3.6
+    - setuptools >= 42
+    - pandas
+    - SPIEPy
+    - scipy
+    - numpy
+    - matplotlib
+    - access2theMatrix
+    - lmfit
+    - pySPM
+    - SPM
+    - wheel
+
+test:
+  imports:
+    - 
+
+about:
+  home: https://github.com/darianSmalley/NanoscoPy
+  license: MIT
+  license_family: MIT
+  summary: experimental microscopy data processor
+
+  license_file: LICENSE
+  summary: 'A python package for obtaining and manipulating Tb files from the MEaSUREs database'
+
+  description: |
+    NanoscoPy is an open source repo for the analysis of experimental microscopy data common in materials and surface science.
+  dev_url: https://github.com/darianSmalley/NanoscoPy
