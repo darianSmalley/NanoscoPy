@@ -6,4 +6,3 @@ matplotlib==3.4.2
 access2theMatrix==0.4.1
 lmfit==1.0.2
 pySPM==0.2.23
-SPM==0.9.1

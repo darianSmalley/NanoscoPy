@@ -8,8 +8,6 @@ requires = [
   "matplotlib",
   "access2theMatrix",
   "lmfit",
-  "pySPM",
-  "SPM",
-  "wheel"
+  "pySPM"
 ]
 build-backend = "setuptools.build_meta"
