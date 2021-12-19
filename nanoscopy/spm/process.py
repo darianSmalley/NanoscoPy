@@ -63,7 +63,7 @@ def correct(images):
         try:
             corrected = basic_correction(image)
             output.append(corrected)
-            progbar(i, n, 10, 'Corrcting images')
+            progbar(i, n, n, 'Corrcting images')
 
         except Exception as error:
             print(error)
