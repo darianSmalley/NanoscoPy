@@ -48,7 +48,7 @@ def flatten(images):
         try:
             flattened = basic_flatten(image)
             output.append(flattened)
-            progbar(i, n, 10, 'Corrcting images...')
+            progbar(i+1, n, 10, 'Corrcting images...')
 
         except Exception as error:
             print(error)
@@ -63,13 +63,12 @@ def correct(images):
         try:
             corrected = basic_correction(image)
             output.append(corrected)
-            progbar(i, n, n, 'Corrcting images')
+            progbar(i+1, n, 10, 'Corrcting images...Done' if i+1==n else 'Corrcting images...')
 
         except Exception as error:
             print(error)
             output.append(image)
     
-    print(' ...DONE')
     return output
 
 def subtract_poly1D(image , poly_order = 2, mask = None , axis = 'x'):

@@ -410,7 +410,7 @@ def read(path, filename_filter = ''):
 
     return data
 
-def export_spm(images, dst_paths = ['./'], ext = 'jpg', 
+def export_images(images, dst_paths = ['./'], ext = 'jpg', 
                scan_dir = 'up', cmap = 'gray'):
     """
     Exports image from numpy array
@@ -428,3 +428,6 @@ def export_spm(images, dst_paths = ['./'], ext = 'jpg',
     for image, dst_path in zip(images, dst_paths):
         origin = 'lower' if scan_dir == 'up' else 'upper'
         plt.imsave(dst_path, image, cmap=cmap, origin=origin)
+
+def export_metadata():
+    
