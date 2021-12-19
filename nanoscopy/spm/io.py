@@ -156,11 +156,10 @@ def read_mtrx(path):
                 image.set_headers(mtrx.param)
 
                 for _, raster in rasters.items():
-                    mtrx_image, message = mtrx.select_image(raster)
-                    print(message)
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)
-
+                    
+                    mtrx_image, message = mtrx.select_image(raster)
                     nan_mask = ~np.isnan(mtrx_image.data)
                     mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
                     image.add_data(channel, np.array(mtrx_image.data))
