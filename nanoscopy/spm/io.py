@@ -36,6 +36,86 @@ def read_sxm(path):
         filename = Path(path).with_suffix('').parts[-1]
         filename_parts = filename.split('_')
         probe = filename_parts[1]
+        sample_id = '_'.join(filename_parts[0:2])
+        rec_index = filename_parts[-1]
+
+        direction = sxm.header['SCAN_DIR'][0][0]
+        bias = float(sxm.header['BIAS'][0][0])
+        setpoint = float(sxm.header['Z-CONTROLLER'][1][3])
+        setpoint_unit = sxm.header['Z-CONTROLLER'][1][4]
+        width = sxm.size['real']['x']
+        height = sxm.size['real']['y']
+        speed = sxm.header['Scan>speed forw. (m/s)'][0][0]
+        time_per_line = sxm.header['SCAN_TIME'][0][0]
+
+        # Get and correct channel list
+        channels = sxm.header['Scan>channels'][0]
+        channels = '_'.join(channels)
+        channels = channels.split(';')
+
+        # Get and convert date/time stamp
+        date = sxm.header['REC_DATE'][0][0]
+        time = sxm.header['REC_TIME'][0][0]
+        datetime_string = date + ' ' + time
+        datetime_object = datetime.strptime(datetime_string, '%d.%m.%Y %H:%M:%S')
+
+        dfs = []
+        for channel in CHANNELS:
+            for trace in TRACES:
+                sxm_data = sxm.get_channel(channel, direction = trace).pixels
+                nan_mask = ~np.isnan(sxm_data)
+                img_data = np.where(nan_mask, sxm_data, 0)
+
+                data = [
+                    f'{sample_id}_{rec_index}', 
+                    probe,
+                    channel,
+                    direction,
+                    trace,
+                    setpoint,
+                    bias,
+                    width,
+                    height,
+                    time_per_line,
+                    datetime_object.isoformat(),
+                    path,
+                    img_data
+                ]
+                
+                formatted_data = dict(zip(SPMImage.data_headers, data))
+                df = pd.DataFrame([formatted_data])
+                dfs.append(df)
+
+        # Append list of dataframes into single dataframe
+        dataframe = pd.concat(dfs)
+        # Create SPMImage to store data and metadata
+        image = SPMImage(dataframe, sxm.header)
+
+        return image
+
+    except Exception as error:
+        print('Error detected:', error)
+        raise
+
+
+def read_sxm_old(path):
+    """
+    Need to update this docstring
+
+    Inputs:
+        path: string. Specifies the full file path (including file extension) of the file to be imported.
+    
+    Outputs:
+        data: SPMImage. Contains the imported data. 
+    """
+    try:
+        # Open SXM file
+        sxm = pySPM.SXM(path)
+
+        # Add records of important scan parameters
+        filename = Path(path).with_suffix('').parts[-1]
+        filename_parts = filename.split('_')
+        probe = filename_parts[1]
         sample_id = filename_parts[2]
         rec_index = filename_parts[-1]
 
@@ -88,7 +168,7 @@ def read_sxm(path):
         print('Error detected:', error)
         raise
 
-def read_mtrx(path):
+def read_mtrx_old(path):
     """
     Imports tabular data from a text file.
 
@@ -158,7 +238,7 @@ def read_mtrx(path):
                 for _, raster in rasters.items():
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)
-                    
+
                     mtrx_image, message = mtrx.select_image(raster)
                     nan_mask = ~np.isnan(mtrx_image.data)
                     mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
@@ -177,6 +257,96 @@ def read_mtrx(path):
         
         dataframe = pd.DataFrame(data)
         image.add_dataframe(dataframe)
+        return image
+
+    except Exception as error:
+        raise
+
+def read_mtrx(path):
+    """
+    Imports tabular data from a text file.
+
+    Inputs:
+        path: string. Specifies the full file path (including file extension) of the file to be imported.
+        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
+    
+    Outputs:
+        data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    """
+    try: 
+        # TODO: check if path has extension and remove it
+        
+        # pprint.pprint(mtrx_channels)
+
+        # Get I and Z mtrx file paths for this image.   
+        Z_path = f'{path}.Z_mtrx'
+        I_path = f'{path}.I_mtrx'
+        mtrx_channels = {
+            'Z': glob.glob(Z_path),
+            'Current': glob.glob(I_path)
+        }
+
+        # Add records of important scan parameters
+        filename = Path(path).with_suffix('').parts[-1]
+        filename_parts = filename.split('--')
+        probe = 'WTip'
+        sample_id = filename_parts[0]
+        rec_index = filename_parts[-1]
+
+        dfs = []
+        # Get data and store in SPMImage class
+        for channel, channel_paths in mtrx_channels.items():
+            for channel_path in channel_paths:
+                # Create mtrx class to access data
+                mtrx = access2thematrix.MtrxData()    
+                rasters, message = mtrx.open(channel_path)
+
+                # Retreive records of important scan parameters
+                setpoint, setpoint_unit = mtrx.param['EEPA::Regulator.Setpoint_1']
+                bias, _ = mtrx.param['EEPA::GapVoltageControl.Voltage']
+                width, _ = mtrx.param['EEPA::XYScanner.Width']
+                height, _ = mtrx.param['EEPA::XYScanner.Height']
+                relocation_step, _ = mtrx.param['EEPA::XYScanner.Relocation_Step_Limit']
+                relocation_time, _ = mtrx.param['EEPA::XYScanner.Relocation_Time_Limit']
+                raster_time, _ = mtrx.param['EEPA::XYScanner.Raster_Time']
+                speed = width/raster_time
+
+                # Get and convert date/time stamp
+                datetime_string = mtrx.param['BKLT']
+                datetime_object = datetime.strptime(datetime_string, '%A, %d %B %Y %H:%M:%S')
+
+                # Add important scan parameters to SPMimage
+                for _, raster in rasters.items():
+                    trace, direction = raster.split('/')
+                    mtrx_image, message = mtrx.select_image(raster)
+                    nan_mask = ~np.isnan(mtrx_image.data)
+                    mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
+
+                    data = [
+                        f'{sample_id}_{rec_index}', 
+                        probe,
+                        channel,
+                        direction,
+                        trace,
+                        setpoint,
+                        bias,
+                        width,
+                        height,
+                        raster_time,
+                        datetime_object.isoformat(),
+                        path,
+                        mtrx_image
+                    ]
+
+                    formatted_data = dict(zip(SPMImage.data_headers, data))
+                    df = pd.DataFrame([formatted_data])
+                    dfs.append(df)
+
+        # Append list of dataframes into single dataframe
+        dataframe = pd.concat(dfs)
+        # Create SPMImage to store data and metadata
+        image = SPMImage(dataframe, mtrx.param)
+
         return image
 
     except Exception as error:
@@ -226,7 +396,7 @@ def read(path, filename_filter = ''):
         # Get all files with mtrx extension and extend data list
         mtrxs = list(filter(lambda p: p.endswith('_mtrx'), paths))
         if len(mtrxs):
-            print(f'Processing {len(mtrxs)} sxm files...', end="", flush=True)
+            print(f'Reading {len(mtrxs)} mtrx files...', end="", flush=True)
             # convert list of absolute paths to set of unique file names 
             mtrxs = set(map(lambda path: Path(path).stem, mtrxs))
 

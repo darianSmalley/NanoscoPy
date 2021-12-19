@@ -1,12 +1,42 @@
 from collections.abc import MutableMapping
-
+from datetime import datetime
 from numpy import exp
 import pandas as pd
 
 CHANNEL_ERROR = 'Channel not supported.'
 DIRECTION_ERROR = 'Direction not supported.'
 
-class SPMImage(MutableMapping):
+class SPMImage():
+    data_headers = [
+        'sample_id',
+        'probe',
+        'channel',
+        'direction',
+        'trace',
+        'setpoint (A)',
+        'voltage (V)',
+        'width (m)',
+        'height (m)',
+        'scan_time (s)',
+        'datetime',
+        'path',
+        'image'
+    ]
+
+    def __init__(self, dataframe,  metadata) -> None:
+        self.metadata = metadata
+        self.dataframe = dataframe
+
+    def summary(self):
+        sample_id = self.dataframe['sample_id'].iloc[0]
+        channel = self.dataframe['channel'].iloc[0]
+        datetime_obj = datetime.fromisoformat(self.dataframe['datetime'].iloc[0])
+        date = datetime_obj.strftime('%y%m%d')
+        bias = self.dataframe['voltage (V)'].iloc[0]
+        size = round(self.dataframe['width (m)'].iloc[0] * pow(10,9))
+        return f"{sample_id}_{date}_{bias}V_{size}x{size}_{channel}"
+
+class SPMImage_dict(MutableMapping):
     def __init__(self, path='', *args, **kwargs):
         self.path = path
         self.params = dict()
@@ -17,16 +47,18 @@ class SPMImage(MutableMapping):
     
     def reformate(self, channel):
         cols = [
-            'channels',
-            'paths',
-            'setpoints',
-            'voltages',
-            'widths',
-            'heights',
-            'datetimes',
-            'directions',
-            'traces',
-            'images'
+            'sample_id',
+            'probe',
+            'channel',
+            'path',
+            'setpoint',
+            'voltage',
+            'width',
+            'height',
+            'datetime',
+            'direction',
+            'trace',
+            'image'
         ]
         data = {col:[] for col in cols}
         n = len(self.data[channel])
