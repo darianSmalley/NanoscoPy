@@ -15,6 +15,46 @@ class SPMImage(MutableMapping):
         self.traces = {'Z':[], 'Current':[]}
         self.update(*args, **kwargs)
     
+    def reformate(self, channel):
+        cols = [
+            'channels',
+            'paths',
+            'setpoints',
+            'voltages',
+            'widths',
+            'heights',
+            'datetimes',
+            'directions',
+            'traces',
+            'images'
+        ]
+        data = {col:[] for col in cols}
+        n = len(self.data[channel])
+
+        for i in range(n):
+            data['channels'].append(channel)
+            data['directions'].append(self.traces[channel][i]['direction'])
+            data['traces'].append(self.traces[channel][i]['trace'])
+            data['setpoints'].append(self.params['setpoint_value'])
+            data['voltages'].append(self.params['setpoint_value'])
+            data['widths'].append(self.params['setpoint_value'])
+            data['heights'].append(self.params['setpoint_value'])
+            data['datetimes'].append(self.params['date_time'].isoformat())
+            data['paths'].append(self.path)
+            img = self.data[channel][i]
+            data['images'].append(img)
+
+        return data
+
+    def as_dataframe(self):
+        Z_data = self.reformate('Z')
+        Z_dataframe = pd.DataFrame(Z_data)
+
+        I_data = self.reformate('Current')
+        I_dataframe = pd.DataFrame(I_data)
+
+        return pd.concat([Z_dataframe,I_dataframe])
+
     def add_param(self, param, value):
         self.params[param] = value
 

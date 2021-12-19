@@ -114,13 +114,24 @@ def read_mtrx(path):
         # pprint.pprint(mtrx_channels)
         print(f'Processing {Path(path).stem}...', end="", flush=True)
 
+        data = {
+            'channels': [],
+            'paths':   [],
+            'setpoints': [],
+            'voltages': [],
+            'widths': [],
+            'heights': [],
+            'datetimes': [],
+            'directions': [],
+            'traces': [],
+            'images': []
+        }
+
         # Create SPMImage class object
         image = SPMImage(path)
-        data = {}
         # Get data and store in SPMImage class
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
-            
                 # Create mtrx class to access data
                 mtrx = access2thematrix.MtrxData()    
                 rasters, message = mtrx.open(channel_path)
@@ -143,32 +154,30 @@ def read_mtrx(path):
                 image.add_param('height', scan_height)
                 image.add_param('date_time' , datetime_object)
                 image.set_headers(mtrx.param)
-                
+
                 for _, raster in rasters.items():
                     mtrx_image, message = mtrx.select_image(raster)
                     print(message)
-                    
-                    nan_mask = ~np.isnan(mtrx_image.data)
-                    mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
-                    image.add_data(channel, mtrx_image.data)
-                    
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)
-                    data.append([channel, direction, trace, [mtrx_image.data]])
 
-                    data['setpoint']= setpoint
-                    data['bias'] = voltage
-                    data['width'] = scan_width
-                    data['height'] = scan_height
-                    data['data_time'] = datetime_string
-                    data['direction'] = direction
-                    data['trace'] = trace
-                    data[channel] = mtrx_image.data
+                    nan_mask = ~np.isnan(mtrx_image.data)
+                    mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
+                    image.add_data(channel, np.array(mtrx_image.data))
 
+                    data['channels'].append(channel)
+                    data['directions'].append(direction)
+                    data['traces'].append(trace)
+                    data['setpoints'].append(setpoint)
+                    data['voltages'].append(voltage)
+                    data['widths'].append(scan_width)
+                    data['heights'].append(scan_height)
+                    data['datetimes'].append(datetime_string)
+                    data['paths'].append(channel_path)
+                    data['images'].append(np.array(mtrx_image.data))
         
-        dataframe = pd.DataFrame(data, columns=['Channel', 'Direction', 'Trace', 'Image'])
+        dataframe = pd.DataFrame(data)
         image.add_dataframe(dataframe)
-        print('DONE')
         return image
 
     except Exception as error:
