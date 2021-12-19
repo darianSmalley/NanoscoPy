@@ -3,7 +3,7 @@ from scipy.special import erfc
 from lmfit.models import GaussianModel , LorentzianModel, VoigtModel , ConstantModel
 import numpy as np
 from math import pi, sqrt, log , exp
-from .spectrum import Spectrum
+from .peak_fit import PeakFit
 
 # To do list:
 #   - Make it so that pre-defined models also use the height/FWHM-> amplitude/sigma conversions.

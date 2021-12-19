@@ -3,6 +3,17 @@ import spiepy
 from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
+from ..utilities import progbar
+
+def rescale(image):
+    ''' Rescale images to 0-255 as type unit8 for use with open CV '''
+    return ((image - image.min()) * (1/(image.max() - image.min()) * 255)).astype('uint8')
+
+def CLAHE(image):
+    ''' Contrast Limited Adaptive Histogram Equalization '''
+    # create a CLAHE object (Arguments are optional).
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    return clahe.apply(image)
 
 def line_flatten(image):
     image = np.array(image)
@@ -14,25 +25,51 @@ def line_flatten(image):
     return output
 
 def basic_flatten(image):
+    ''' 2nd order polynomial plane fitting, then line-by-line average offset '''
     im = spiepy.Im()
     im.data = image
     im, _ = spiepy.flatten_xy(im)
     im, _ = spiepy.flatten_poly_xy(im, deg=2)
     im = line_flatten(im.data)
+    return im
+
+def basic_correction(image):
+    ''' basic flatten, then rescale to [0,255] as uint8, then equalize, finaly smooth.'''
+    im = basic_flatten(image)
+    im = rescale(im)
+    im = CLAHE(im)
     im = cv2.GaussianBlur(im,(3,3), cv2.BORDER_DEFAULT)
     return im
 
 def flatten(images):
     output = []
-    for image in images:
+    n = len(images)
+    for i, image in enumerate(images):
         try:
             flattened = basic_flatten(image)
             output.append(flattened)
+            progbar(i, n, 10, 'Corrcting images...')
 
         except Exception as error:
             print(error)
             output.append(image)
     
+    return output
+
+def correct(images):
+    output = []
+    n = len(images)
+    for i, image in enumerate(images):
+        try:
+            corrected = basic_correction(image)
+            output.append(corrected)
+            progbar(i, n, 10, 'Corrcting images')
+
+        except Exception as error:
+            print(error)
+            output.append(image)
+    
+    print(' ...DONE')
     return output
 
 def subtract_poly1D(image , poly_order = 2, mask = None , axis = 'x'):

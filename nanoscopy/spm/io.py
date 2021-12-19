@@ -8,7 +8,9 @@ import access2thematrix
 import matplotlib.pyplot as plt
 from pathlib import Path
 import pprint
+
 from .SPMImage import SPMImage
+from ..utilities import progbar
 
 spm_ext = tuple(['.sxm', '.Z_mtrx'])
 CHANNELS = ['Z' , 'Current']
@@ -22,24 +24,32 @@ def read_sxm(path):
 
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
-        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
     
     Outputs:
-        data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+        data: SPMImage. Contains the imported data. 
     """
     try:
-        print(f'Processing {path}...', end="", flush=True)
         # Open SXM file
         sxm = pySPM.SXM(path)
 
         # Add records of important scan parameters
-        channels = sxm.header['Scan>channels'][0]
+        filename = Path(path).with_suffix('').parts[-1]
+        filename_parts = filename.split('_')
+        probe = filename_parts[1]
+        sample_id = filename_parts[2]
+        rec_index = filename_parts[-1]
+
         scan_direction = sxm.header['SCAN_DIR'][0][0]
         bias = float(sxm.header['BIAS'][0][0])
         setpoint_value = float(sxm.header['Z-CONTROLLER'][1][3])
         setpoint_unit = sxm.header['Z-CONTROLLER'][1][4]
         width = sxm.size['real']['x']
         height = sxm.size['real']['y']
+
+        # Get and correct channel list
+        channels = sxm.header['Scan>channels'][0]
+        channels = '_'.join(channels)
+        channels = channels.split(';')
 
         # Get and convert date/time stamp
         date = sxm.header['REC_DATE'][0][0]
@@ -50,13 +60,17 @@ def read_sxm(path):
         # Create SPMImage class object
         image = SPMImage(path)
         image.add_param('bias', bias)
-        image.add_param('setpoint_value', setpoint_value)
-        image.add_param('setpoint_unit', setpoint_unit) 
+        image.add_param('channels', channels)
+        image.add_param('date_time' , datetime_object)
         image.add_param('width', width)
         image.add_param('height', height)
-        image.add_param('channels', channels)
+        image.add_param('setpoint_value', setpoint_value)
+        image.add_param('setpoint_unit', setpoint_unit) 
         image.add_param('scan_direction', scan_direction)
-        image.add_param('date_time' , datetime_object)
+        image.add_param('probe', probe)
+        image.add_param('sample_id', sample_id)
+        image.add_param('rec_index', rec_index)
+
         image.set_headers(sxm.header)
 
         # Get data and store in SPMImage class
@@ -68,7 +82,6 @@ def read_sxm(path):
                 image.add_data(channel, data)
                 image.add_trace(channel, scan_direction, trace)
 
-        print('DONE')
         return image
 
     except Exception as error:
@@ -98,12 +111,12 @@ def read_mtrx(path):
         }
         
         print('Found the following mtrx files in path:')
-        pprint.pprint(mtrx_channels)
+        # pprint.pprint(mtrx_channels)
         print(f'Processing {Path(path).stem}...', end="", flush=True)
 
         # Create SPMImage class object
         image = SPMImage(path)
-
+        data = {}
         # Get data and store in SPMImage class
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
@@ -141,14 +154,27 @@ def read_mtrx(path):
                     
                     trace, direction = raster.split('/')
                     image.add_trace(channel, direction, trace)
-            
+                    data.append([channel, direction, trace, [mtrx_image.data]])
+
+                    data['setpoint']= setpoint
+                    data['bias'] = voltage
+                    data['width'] = scan_width
+                    data['height'] = scan_height
+                    data['data_time'] = datetime_string
+                    data['direction'] = direction
+                    data['trace'] = trace
+                    data[channel] = mtrx_image.data
+
+        
+        dataframe = pd.DataFrame(data, columns=['Channel', 'Direction', 'Trace', 'Image'])
+        image.add_dataframe(dataframe)
         print('DONE')
         return image
 
     except Exception as error:
         raise
 
-def read(path):
+def read(path, filename_filter = ''):
     """
     Imports microscopy image data from Nanonis (.sxm) and Omicron (.Z_mtrx, .I_mtrx) files.
 
@@ -171,12 +197,12 @@ def read(path):
         else:
             raise ValueError(FILETYPE_ERROR)
     else:
-        # if path points to a folder, get all paths in folder 
-        paths = glob.glob(os.path.join(path, '*'), recursive=True)
-
+        # if path points to a folder, get all paths in folder according to filter
+        paths = glob.glob(os.path.join(path, f'**/*{filename_filter}*'), recursive=True)
+        n = len(paths)
+        
         # Check if any files were found
-        if len(paths) == 0:
-            raise ValueError(FILES_NOT_FOUND_ERROR)
+        if n == 0: raise ValueError(FILES_NOT_FOUND_ERROR)
 
         # Create empty data list
         data = []
@@ -184,12 +210,15 @@ def read(path):
         # Get all files with sxm extension and extend data list
         sxms = list(filter(lambda p: p.endswith('sxm'), paths))
         if len(sxms):
+            print(f'Reading {len(sxms)} sxm files...', end="", flush=True)
             sxm_data = list(map(read_sxm, sxms))
             data.extend(sxm_data)
+            print('DONE')
 
         # Get all files with mtrx extension and extend data list
         mtrxs = list(filter(lambda p: p.endswith('_mtrx'), paths))
         if len(mtrxs):
+            print(f'Processing {len(mtrxs)} sxm files...', end="", flush=True)
             # convert list of absolute paths to set of unique file names 
             mtrxs = set(map(lambda path: Path(path).stem, mtrxs))
 
@@ -199,9 +228,11 @@ def read(path):
                 mtrx_image = read_mtrx(file_path)
                 data.append(mtrx_image)
 
+            print('DONE')
+
     return data
 
-def export_spm(images, dst_paths = ['./'], ext = 'jpeg', 
+def export_spm(images, dst_paths = ['./'], ext = 'jpg', 
                scan_dir = 'up', cmap = 'gray'):
     """
     Exports image from numpy array
@@ -216,8 +247,6 @@ def export_spm(images, dst_paths = ['./'], ext = 'jpeg',
     if not isinstance(images, list): images = [images]
     if not isinstance(dst_paths, list): dst_paths = [dst_paths]
 
-    for image, path in zip(images, dst_paths):
-        path_without_ext = Path(path).with_suffix('')
-        dst = f'{path_without_ext}.{ext}'
+    for image, dst_path in zip(images, dst_paths):
         origin = 'lower' if scan_dir == 'up' else 'upper'
-        plt.imsave(dst, image, cmap=cmap, origin=origin)
+        plt.imsave(dst_path, image, cmap=cmap, origin=origin)

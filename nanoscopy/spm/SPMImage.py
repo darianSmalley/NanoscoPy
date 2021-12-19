@@ -1,5 +1,8 @@
 from collections.abc import MutableMapping
 
+from numpy import exp
+import pandas as pd
+
 CHANNEL_ERROR = 'Channel not supported.'
 DIRECTION_ERROR = 'Direction not supported.'
 
@@ -20,18 +23,29 @@ class SPMImage(MutableMapping):
             self.data[channel] = []
             
         self.data[channel].append(data)
-        
+
     def add_trace(self, channel, direction, trace):
         if channel not in self.data:
             self.traces[channel] = []
 
         self.traces[channel].append({'direction': direction, 'trace': trace})
 
+    def add_dataframe(self, dataframe):
+        self.dataframe = dataframe
+
     def get_data(self, channel):
         return dict(zip(self.traces[channel], self.data[channel]))
     
     def set_headers(self, headers):
         self.headers = headers
+
+    def summary(self):
+        sample_id = self.params['sample_id']
+        date = self.params['date_time'].strftime('%y%m%d')
+        bias = self.params['bias']
+        size = round(self.params['width'] * pow(10,9))
+        rec_index = self.params['rec_index']
+        return f"{sample_id}_{date}_{bias}V_{size}x{size}_Z_{rec_index}"
 
     # The next five methods are requirements of the collection
     def __setitem__(self, key, value):
@@ -48,7 +62,8 @@ class SPMImage(MutableMapping):
     # The final two methods aren't required, but nice for demo purposes:
     def __str__(self):
         '''returns simple dict representation of the mapping'''
-        return ', '.join("%s: %s" % item for item in vars(self).items())
+        # return ', '.join("%s: %s" % item for item in vars(self).items())
+        return f'Path: {self.path}\nParams: {self.params}'
     def __repr__(self):
         '''echoes class, id, & reproducible representation in the REPL'''
         return '{}, SPMImage({})'.format(super(SPMImage, self).__repr__(), 
