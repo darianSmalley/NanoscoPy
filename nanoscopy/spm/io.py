@@ -87,7 +87,7 @@ def read_sxm(path):
                 dfs.append(df)
 
         # Append list of dataframes into single dataframe
-        dataframe = pd.concat(dfs)
+        dataframe = pd.concat(dfs, ignore_index=True)
         # Create SPMImage to store data and metadata
         image = SPMImage(dataframe, sxm.header)
 
@@ -343,7 +343,7 @@ def read_mtrx(path):
                     dfs.append(df)
 
         # Append list of dataframes into single dataframe
-        dataframe = pd.concat(dfs)
+        dataframe = pd.concat(dfs, ignore_index=True)
         # Create SPMImage to store data and metadata
         image = SPMImage(dataframe, mtrx.param)
 

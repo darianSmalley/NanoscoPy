@@ -28,12 +28,12 @@ class SPMImage():
         self.dataframe = dataframe
 
     def summary(self):
-        sample_id = self.dataframe['sample_id'].iloc[0]
-        channel = self.dataframe['channel'].iloc[0]
-        datetime_obj = datetime.fromisoformat(self.dataframe['datetime'].iloc[0])
+        sample_id = self.dataframe.at[0, 'sample_id']
+        channel = self.dataframe.at[0, 'channel']
+        datetime_obj = datetime.fromisoformat(self.dataframe.at[0, 'datetime'])
         date = datetime_obj.strftime('%y%m%d')
-        bias = self.dataframe['voltage (V)'].iloc[0]
-        size = round(self.dataframe['width (m)'].iloc[0] * pow(10,9))
+        bias = self.dataframe.at[0, 'voltage (V)']
+        size = round(self.dataframe.at[0, 'width (m)'] * pow(10,9))
         return f"{sample_id}_{date}_{bias}V_{size}x{size}_{channel}"
 
 class SPMImage_dict(MutableMapping):
