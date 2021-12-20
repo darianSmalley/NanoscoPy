@@ -429,5 +429,7 @@ def export_images(images, dst_paths = ['./'], ext = 'jpg',
         origin = 'lower' if scan_dir == 'up' else 'upper'
         plt.imsave(dst_path, image, cmap=cmap, origin=origin)
 
-def export_metadata():
-    
+def export_metadata(images):
+    metadata = [image.dataframe.drop('image', axis=1) for image in images]
+    metadata = pd.concat(metadata)
+    metadata.to_csv('metadata_out.csv', index=False)

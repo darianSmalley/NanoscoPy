@@ -35,6 +35,7 @@ class SPMImage():
         bias = self.dataframe.at[0, 'voltage (V)']
         size = round(self.dataframe.at[0, 'width (m)'] * pow(10,9))
         return f"{sample_id}_{date}_{bias}V_{size}x{size}_{channel}"
+        
 
 class SPMImage_dict(MutableMapping):
     def __init__(self, path='', *args, **kwargs):
