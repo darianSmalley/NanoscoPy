@@ -19,15 +19,15 @@ setup(
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License'
                 ],
-    install_requires=[
-        'numpy >= 1.20.3', 
-        'pandas >= 1.3.1', 
-        "SPIEPy >= 0.2.0", 
-        "scipy >= 1.7.1",
-        "matplotlib >= 3.4.2",
-        "access2theMatrix >= 0.4.1",
-        "lmfit >= 1.0.2",
-        "pySPM >= 0.2.20"
-        ],
+    # install_requires=[
+    #     'numpy >= 1.20.3', 
+    #     'pandas >= 1.3.1', 
+    #     "SPIEPy >= 0.2.0", 
+    #     "scipy >= 1.7.1",
+    #     "matplotlib >= 3.4.2",
+    #     "access2theMatrix >= 0.4.1",
+    #     "lmfit >= 1.0.2",
+    #     "pySPM >= 0.2.20"
+    #     ],
     python_requires='>=3.6'
 )
