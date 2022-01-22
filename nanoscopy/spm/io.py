@@ -69,7 +69,8 @@ def read_sxm(path):
                 img_data = np.where(nan_mask, sxm_data, 0)
 
                 data = [
-                    f'{sample_id}_{rec_index}', 
+                    sample_id,
+                    rec_index, 
                     probe,
                     channel,
                     direction,

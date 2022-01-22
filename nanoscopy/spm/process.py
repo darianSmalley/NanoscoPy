@@ -19,9 +19,9 @@ def line_flatten(image):
     image = np.array(image)
     output = np.zeros(image.shape)
     for i, row in enumerate(image):
-        mean = np.mean(row)
-        output[i] = row - mean
-    
+        output[i] = row - np.mean(row)
+
+    output = output - np.mean(output)
     return output
 
 def basic_flatten(image):
