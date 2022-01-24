@@ -67,6 +67,13 @@ def read_sxm(path):
                 sxm_data = sxm.get_channel(channel, direction = trace).pixels
                 nan_mask = ~np.isnan(sxm_data)
                 img_data = np.where(nan_mask, sxm_data, 0)
+                # pySPM seems to flip the image to put the origin in the bottom left corner
+                # flip again to correct
+                if direction == 'up':
+                    img_data = np.flipud(img_data)
+                
+                # if (channel == 'Z') and (trace == 'forward'):
+                #     plt.imshow(img_data)
 
                 data = [
                     sample_id,
@@ -479,6 +486,7 @@ def read(path, filename_filter = ''):
     else:
         # if path points to a folder, get all paths in folder according to filter
         paths = glob.glob(os.path.join(path, f'**/*{filename_filter}*.*'), recursive=True)
+        paths = sorted(paths)
         n = len(paths)
         
         # Check if any files were found

@@ -68,7 +68,7 @@ def correct(images):
         except Exception as error:
             print(error)
             output.append(image)
-    
+    print('')
     return output
 
 def subtract_poly1D(image , poly_order = 2, mask = None , axis = 'x'):
