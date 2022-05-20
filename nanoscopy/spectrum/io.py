@@ -34,7 +34,7 @@ def determine_metadata_lines(path, source = 'Nanonis'):
     return metadata_end
 
 def get_metadata(path, metadata_end, source = 'Nanonis'):
-    if source == 'Ishigami':
+    if (source == 'Ishigami') or (source == 'Nanonis'):
         metadata = pd.read_csv(path , sep = '\t' , usecols = [0,1] , names = ['Property','Value'], skiprows = 1, nrows = metadata_end - 1)
     return metadata
 
