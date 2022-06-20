@@ -78,10 +78,10 @@ class PeakFit:
 
         return peak_model
     
-    def make_composite_model(self,model_parameters):
+    def make_composite_model(self,model_parameters, min=1e-6):
         # Initialize the model with a background model.
         background = ConstantModel(prefix='back_')
-        background.set_param_hint('c', value=np.min(self.data_y), min=1e-6)
+        background.set_param_hint('c', value=np.min(self.data_y), min=min)
         self.model = background
 
         # Add peak models.
