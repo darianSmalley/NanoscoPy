@@ -5,7 +5,304 @@ import pandas as pd
 import statsmodels.api as sm
 from patsy import dmatrices
 from patsy import dmatrix
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
+import itertools
+from matplotlib.ticker import PercentFormatter
+import math
+
+# test function
+def test_function(data, a, b, c):
+    x = data[0]
+    y = data[1]
+    return a * (x**b) * (y**c)
+
+def test_function2(data, a, b, c, d, e):
+    x = data[0]
+    y = data[1]
+    return a + b * x + c * y + d*x*y + e
+
+def nonliner_function(data, a, b, c, d, e, f, g, h, k):
+    x = data[0]
+    y = data[1]
+    return a + b * x + c * y + d*x*y + f*(x**2) + h*(y**2) + g*(x*y)**2 + e
+
+def fit_data(fn, X, Y, Z):
+    # get fit parameters from scipy curve fit
+    parameters, covariance = curve_fit(fn, [X, Y], Z)
+
+    # create surface function model
+    # setup data points for calculating surface model
+    model_x_data = np.linspace(min(X), max(X), 50)
+    model_y_data = np.linspace(min(Y), max(Y), 50)
+    # create coordinate arrays for vectorized evaluations
+    X_fit, Y_fit = np.meshgrid(model_x_data, model_y_data)
+    # calculate Z coordinate array
+    Z_fit = fn(np.array([X_fit, Y_fit]), *parameters)
+
+    return X_fit, Y_fit, Z_fit
+
+def calc_main_effect(data, factor, response):
+        high = data[factor].max()
+        low = data[factor].min()
+
+        means = {}
+        for level in [high, low]:
+            factor_level_mask = data[factor] == level
+            level_response_mean = data[factor_level_mask][response].mean()
+            means[level] = level_response_mean
+
+        return means[high] - means[low]
+
+def calc_interaction_effect(data, factor1, factor2, response):
+    high1 = data[factor1].max()
+    low1 = data[factor1].min()
+    high2 = data[factor2].max()
+    low2 = data[factor2].min()
+
+    means = {}
+    for level2 in [high2, low2]:
+        factor2_level_mask = data[factor2] == level2
+        factor2_level_responses = data[factor2_level_mask][response]
+
+        factor2_level_factor1 = data[factor2_level_mask][factor1]
+        conditions = [(factor2_level_factor1 == high1),(factor2_level_factor1 == low1)]
+        choices = [1, -1]
+        factor_signs = np.select(conditions, choices)
+        factor2_responses_factor1_signs = factor2_level_responses * factor_signs
+        factor1_factor2_responses_mean = factor2_responses_factor1_signs.mean()
+        means[level2] = factor1_factor2_responses_mean
+
+    return means[high2] - means[low2]    
+
+def calc_effects(data, response_label, factor_labels):
+    main_effects = [calc_main_effect(data, factor_label, response_label) for factor_label in factor_labels]
+    factor_pairs = itertools.combinations(factor_labels, 2)
+    interaction_effects = []
+
+    for factor_label1, factor_label2 in factor_pairs:
+            interaction_effect = calc_interaction_effect(data, factor_label1, factor_label2, response_label)
+            interaction_effects.append(interaction_effect)        
+    
+    effects = main_effects + interaction_effects
+    return effects
+
+def _plot_response_surfaces(data, response_label, factor_labels):
+        cmap = "cool"
+        cmap = "viridis"
+        label_pad = 10
+        axis_font_size = 12
+        tick_font_size = 14
+
+        n = len(factor_labels)
+        fig_scale = 4
+        fig, axs = plt.subplots(n, n, figsize=(fig_scale*n,fig_scale*n), constrained_layout=True, subplot_kw={'projection': '3d'})
+        plt.suptitle(response_label + " Response Surfaces", fontsize=22)
+
+        # build a rectangle in axes coords
+        left, width = -0.33, 1.66
+        bottom, height = -0.2, 1.4
+        right = left + width
+        top = bottom + height
+
+        Z = data[response_label]
+        C = data[response_label]
+        ln_C = np.log(C)
+        S = np.full((len(Z),), 100)
+
+        for i, row in enumerate(axs):
+            for j, ax in enumerate(row):
+                factor_A_label = factor_labels[i]
+                factor_B_label = factor_labels[j]
+
+                X = data[factor_A_label]
+                Y = data[factor_B_label]
+                fit = fit_data(function, X, Y, Z)
+                ax.plot_surface(*fit, alpha=0.5)
+                ax.scatter(X, Y, Z, s=S, c=ln_C, label = C, cmap=cmap, alpha=1.0)
+                # handles1, labels1 = scatter1.legend_elements(prop="colors")
+                # legend1 = ax.legend(handles1, labels1, loc="lower right", title=c_label)
+                # ax.set_title("Maximum CNTF Height Response", fontsize=18, pad=20)
+                ax.view_init(15, 60)
+                ax.tick_params(axis='both', which='major', labelsize=tick_font_size)
+                ax.set_xlabel(factor_A_label, fontsize=axis_font_size, labelpad=label_pad)
+                ax.set_ylabel(factor_B_label, fontsize=axis_font_size, labelpad=label_pad)
+                ax.set_zlabel(response_label, fontsize=axis_font_size)
+                ax.invert_xaxis()
+
+                # handles, labels = scatter.legend_elements(prop="sizes", alpha=0.6)
+                # legend2 = ax.legend(handles, labels, loc="upper right", title="Sizes")
+                # for i in range(len(X)): #plot each point + it's index as text above
+                #     ax.text(X[i]+0.5, Y[i]+0.5, Z[i], f'Flow: {C[i]}', size=16, zorder=1, color='k', weight='bold') 
+
+        plt.show()
+
+def linear(x, m, b):
+    return m*x + b
+
+def _plot_effect_grid(data, response_label, factor_labels):
+    fontsize = 16
+    n = len(factor_labels)
+    fig_scale = 4
+    fig, axs = plt.subplots(n, n, figsize=(fig_scale*n,fig_scale*n))
+    y = data[response_label]
+    C = data[response_label]
+
+    # build a rectangle in axes coords
+    left, width = -0.33, 1.66
+    bottom, height = -0.2, 1.4
+    right = left + width
+    top = bottom + height
+
+    for i, row in enumerate(axs):
+        for j, ax in enumerate(row):
+            factor = factor_labels[i]
+
+            if i == j:
+                # main effects
+                x = data[factor]
+
+                # linear fit
+                param, param_cov = curve_fit(linear, x, y)
+                # ans stores the new y-data according to
+                # the coefficients given by curve-fit() function
+                ans = param[0]*x + param[1]
+                # print(param[0], param[1])
+
+                # z = np.polyfit(x, y1, 1)
+                # p = np.poly1d(z)
+                # print(z)
+
+                scatter = ax.scatter(x, y, s=100, c=C)
+                ax.plot(x, ans, linestyle='dashed', color ='black', label='linear fit')
+                # ax.text(1.0, 0.2, f'Intercept = {param[0]:.2}, Slope = {param[1]:.2}', fontsize = 11)
+
+                # ax.set_ylim(ymin=0, ymax=200)
+                ax.set_xlabel(factor)
+                ax.set_ylabel(response_label)
+                ax.set_title(f'{factor}')
+                ax.legend(loc='best')
+                # fig.colorbar(scatter, label=response_2_label)
+
+                if i == 0:
+                    ax.text(0.5*(left+right), top, factor,
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            transform=ax.transAxes,
+                            fontsize=fontsize, 
+                            fontweight='bold')
+                    ax.text(left, 0.5*(bottom+top), factor,
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            rotation=90,
+                            transform=ax.transAxes,
+                            fontsize=fontsize, 
+                            fontweight='bold')
+
+            else:
+                # interaction effects
+                factor1 = factor
+                factor2 = factor_labels[j]
+
+                high1 = data[factor1].max()
+                low1 = data[factor1].min()
+                high2 = data[factor2].max()
+                low2 = data[factor2].min()
+
+                maskHighAHighB = (data[factor1] == high1) & (data[factor2] == high2)
+                maskHighALowB = (data[factor1] == high1) & (data[factor2] == low2)
+                maskLowAHighB = (data[factor1] == low1) & (data[factor2] == high2)
+                maskLowALowB = (data[factor1] == low1) & (data[factor2] == low2)
+
+                y1 = data[maskLowAHighB][response_label].mean() 
+                y2 = data[maskLowALowB][response_label].mean()
+                y3 = data[maskHighAHighB][response_label].mean()
+                y4 = data[maskHighALowB][response_label].mean()
+
+                ax.plot([low1, high1], [y1,y3], label=f'+ {factor2}')
+                ax.plot([low1, high1], [y2,y4], label=f'- {factor2}')
+                ax.set_xlabel(f'{factor1}')
+                ax.set_ylabel(response_label)
+                ax.set_title(f'{factor1}:{factor2}')
+                ax.legend(loc='best')
+
+                if i == 0:
+                    ax.text(0.5*(left+right), top, factor2,
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            transform=ax.transAxes,
+                            fontsize=fontsize, 
+                            fontweight='bold')
+                if j == 0:
+                    ax.text(left, 0.5*(bottom+top), factor,
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            rotation=90,
+                            transform=ax.transAxes,
+                            fontsize=fontsize, 
+                            fontweight='bold')
+
+    fig.tight_layout()
+    plt.show()
+
+def _Pareto_plot(effects, factor_labels, xlabel, ylabel):
+    colors = []
+    signs = []
+    for effect in effects:
+        if effect < 0:
+            colors.append('gray')
+            signs.append(-1)
+        else:
+            colors.append('royalblue')
+            signs.append(1)
+
+    effects_df = pd.DataFrame({
+                    'factors': factor_labels,
+                    'effects': np.abs(effects),
+                    'signs': signs,
+                    'colors': colors
+                })
+
+    effects_df_sorted = effects_df.sort_values('effects', ascending=False)
+    x = effects_df_sorted['factors'].values
+    y = effects_df_sorted['effects'].values
+    c = effects_df_sorted['colors'].values
+    s = effects_df_sorted['signs'].values
+    weights = y / y.sum()
+    cumsum = weights.cumsum()    
+
+    fig, ax1 = plt.subplots()
+    legend_labels = ['Positive Sign','Negative Sign']
+    handles = [plt.Rectangle((0,0), 1,1, color='royalblue'), plt.Rectangle((0,0), 1,1, color='gray')]
+    plt.legend(handles, legend_labels, loc='center right')
+
+    ax1.bar(x, y, color = c)
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylabel)
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, cumsum, '-ro', alpha=0.5)
+    ax2.set_ylabel('', color='r')
+    ax2.tick_params('y', colors='r')
+
+    vals = ax2.get_yticks()
+    ax2.yaxis.set_major_formatter(PercentFormatter())
+
+    # hide y-labels on right side
+    show_pct_y = False
+    if not show_pct_y:
+        ax2.set_yticks([])
+
+    pct_format='{0:.0%}'
+    formatted_weights = [pct_format.format(x) for x in cumsum]
+    for i, txt in enumerate(formatted_weights):
+        ax2.annotate(txt, (x[i], cumsum[i]), fontweight='heavy')    
+
+    title = f'Pareto plot of Main and Interaction Effects on Response'
+    if title:
+        plt.title(title)
+
+    plt.tight_layout()
+    plt.show()
 
 class factorial_doe:
     """
@@ -213,4 +510,18 @@ class factorial_doe:
                 bounds = bounds)
             self.results_details.append(opt)
             self.results.append(self.decode_factors(opt.x))
-                
+
+    # ANALYSIS 
+    def plot_response_surfaces(self, response_name):
+        _plot_response_surfaces(self.data_raw, response_name, self.factor_names)
+    
+    def plot_effect_grid(self, response_name):
+        _plot_effect_grid(self.data_raw, response_name, self.factor_names)
+
+    def pareto_plot(self, response_name):
+        effects = calc_effects(self.data_raw, response_name, self.factor_names)
+        xlabel = 'Factors'
+        ylabel = f'Magnitude of Effect on {response_name}'
+        factor_letter_pairs = itertools.combinations(self.factor_labels)
+        factor_letters = self.factor_labels + factor_letter_pairs
+        _Pareto_plot(effects, factor_letters, xlabel, ylabel)
