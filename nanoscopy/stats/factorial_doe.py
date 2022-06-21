@@ -116,7 +116,7 @@ def _plot_response_surfaces(data, response_label, factor_labels):
 
                 X = data[factor_A_label]
                 Y = data[factor_B_label]
-                fit = fit_data(function, X, Y, Z)
+                fit = fit_data(test_function2, X, Y, Z)
                 ax.plot_surface(*fit, alpha=0.5)
                 ax.scatter(X, Y, Z, s=S, c=ln_C, label = C, cmap=cmap, alpha=1.0)
                 # handles1, labels1 = scatter1.legend_elements(prop="colors")
@@ -522,6 +522,6 @@ class factorial_doe:
         effects = calc_effects(self.data_raw, response_name, self.factor_names)
         xlabel = 'Factors'
         ylabel = f'Magnitude of Effect on {response_name}'
-        factor_letter_pairs = itertools.combinations(self.factor_labels)
-        factor_letters = self.factor_labels + factor_letter_pairs
+        factor_letter_pairs = itertools.combinations(self.factor_labels, 2)
+        factor_letters = self.factor_labels + list(factor_letter_pairs)
         _Pareto_plot(effects, factor_letters, xlabel, ylabel)
