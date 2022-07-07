@@ -522,8 +522,7 @@ class factorial_doe:
         effects = calc_effects(self.data_raw, response_name, self.factor_names)
         xlabel = 'Factors'
         ylabel = f'Magnitude of Effect on {response_name}'
-        factor_letter_pairs = [itertools.combinations(self.factor_labels, 2)]
+        factor_letter_tuples = list(itertools.combinations(self.factor_labels, 2))
+        factor_letter_pairs = [factor1 + factor2 for (factor1, factor2) in factor_letter_tuples]
         factor_letters = self.factor_labels + factor_letter_pairs
-
-        print(len(effects), len(factor_letters))
         _Pareto_plot(effects, factor_letters, xlabel, ylabel)
