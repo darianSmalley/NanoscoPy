@@ -24,20 +24,21 @@ def line_flatten(image):
     output = output - np.mean(output)
     return output
 
-def basic_flatten(image):
+def basic_flatten(image, poly=True):
     ''' 2nd order polynomial plane fitting, then line-by-line average offset '''
     im = spiepy.Im()
     im.data = image
     im, _ = spiepy.flatten_xy(im)
-    im, _ = spiepy.flatten_poly_xy(im, deg=2)
+    if poly: 
+        im, _ = spiepy.flatten_poly_xy(im, deg=2)
     im = line_flatten(im.data)
     return im
 
-def basic_correction(image):
+def basic_correction(image, poly, CLAHE=True):
     ''' basic flatten, then rescale to [0,255] as uint8, then equalize, finaly smooth.'''
-    im = basic_flatten(image)
+    im = basic_flatten(image, poly)
     im = rescale(im)
-    im = CLAHE(im)
+    if CLAHE: im = CLAHE(im)
     im = cv2.GaussianBlur(im,(3,3), cv2.BORDER_DEFAULT)
     return im
 
@@ -56,12 +57,16 @@ def flatten(images):
     
     return output
 
-def correct(images):
+def correct(images, terrace=False):
     output = []
     n = len(images)
     for i, image in enumerate(images):
         try:
-            corrected = basic_correction(image)
+            corrected = basic_correction(image, False, False)
+
+            if terrace: 
+                corrected = terrace_level(corrected)
+
             output.append(corrected)
             progbar(i+1, n, 10, 'Corrcting images...Done' if i+1==n else 'Corrcting images...')
 
