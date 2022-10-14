@@ -103,7 +103,7 @@ def read_spectrum(path, source = 'Nanonis', sep='\t'):
         spectrum = read_raman(path, source)
     else:
         data = pd.read_csv(path, sep=sep, engine='python')
-        spectrum = Spectrum(data)
+        spectrum = Spectrum(data, filepath=path)
 
     return spectrum
 
