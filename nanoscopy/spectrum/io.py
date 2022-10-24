@@ -85,7 +85,7 @@ def read_raman(path, source = 'RenishawRaman'):
 
     return spectrum
 
-def read_spectrum(path, source = 'Nanonis'):
+def read_spectrum(path, source = 'Nanonis', sep='\t'):
     """
     Imports tabular data from a text file.
 
@@ -102,8 +102,8 @@ def read_spectrum(path, source = 'Nanonis'):
     elif source in ['RenishawRaman','RenishawPL']:
         spectrum = read_raman(path, source)
     else:
-        data = pd.read_csv(path, sep='\t', engine='python')
-        spectrum = Spectrum(data)
+        data = pd.read_csv(path, sep=sep, engine='python')
+        spectrum = Spectrum(data, filepath=path)
 
     return spectrum
 
@@ -120,7 +120,8 @@ def read_spectra(paths, source = 'Nanonis'):
     """
     if paths[0].endswith(".dat"):
         spectra = list(map(lambda p: read_spectrum(p, source), paths))
-
+    elif paths[0].endswith(".csv"):
+        spectra = list(map(lambda p: read_spectrum(p, source=None, sep=','), paths))
     elif paths[0].endswith(".3ds"):
         spectra = []
     else:
