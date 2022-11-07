@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import glob
+import numpy as np
 
 from .spectrum import Spectrum
 
@@ -29,7 +30,7 @@ def determine_metadata_lines(path, source = 'Nanonis'):
         data_column = pd.read_csv(path , sep = '\t' , usecols = [0] , header = None)
         
         # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
-        metadata_end = data_column[ data_column[0] == "[DATA]"].index[0]
+        metadata_end = data_column[data_column[0] == "[DATA]"].index[0]
     
     return metadata_end
 
@@ -38,19 +39,28 @@ def get_metadata(path, metadata_end, source = 'Nanonis'):
         metadata = pd.read_csv(path , sep = '\t' , usecols = [0,1] , names = ['Property','Value'], skiprows = 1, nrows = metadata_end - 1)
     return metadata
 
-def read_STS(path, source = 'Nanonis'):
+def read_STS(path, source = 'Nanonis', sep = '\t'):
     # Load data into a dataframe
-    # Determine the number of header rows in the file.
-    metadata_end = determine_metadata_lines(path , source = source)
-    metadata = get_metadata(path, metadata_end, source = source)
 
-    # Load only the data portion (with column names), skipping the header.
-    data = pd.read_csv(path , sep = '\t' , header = 1 , skiprows = metadata_end)
+    if source == 'Nanonis':
+        # Determine the number of header rows in the file.
+        metadata_end = determine_metadata_lines(path , source = source)
+        metadata = get_metadata(path, metadata_end, source = source)
+
+        # Load only the data portion (with column names), skipping the header.
+        data = pd.read_csv(path , sep = sep , header = 1 , skiprows = metadata_end)
+
+    else:
+        metadata = None
+        data = pd.read_csv(path, sep=sep, engine='python')
     
-    # Drop any rows that contain NaN as an element.
-    data = data.dropna()
+    # Drop any columns that contain all NaN values
+    data = data.dropna(axis=1, how='all')
+    # Drop any rows that contain any NaN values
+    data = data.dropna(axis=0, how='any')
 
-    spectrum = Spectrum(data, metadata)
+    spectrum = Spectrum(data, metadata, filepath=path)
+
     return spectrum
 
 def read_raman(path, source = 'RenishawRaman'):
@@ -85,6 +95,9 @@ def read_raman(path, source = 'RenishawRaman'):
 
     return spectrum
 
+def read_numpy(path):
+    np.load('/tmp/123.npy')
+
 def read_spectrum(path, source = 'Nanonis', sep='\t'):
     """
     Imports tabular data from a text file.
@@ -102,9 +115,9 @@ def read_spectrum(path, source = 'Nanonis', sep='\t'):
     elif source in ['RenishawRaman','RenishawPL']:
         spectrum = read_raman(path, source)
     else:
-        data = pd.read_csv(path, sep=sep, engine='python')
-        spectrum = Spectrum(data, filepath=path)
-
+        # data = pd.read_csv(path, sep=sep, engine='python')
+        # spectrum = Spectrum(data, filepath=path)
+        spectrum = read_STS(path, source, sep)
     return spectrum
 
 def read_spectra(paths, source = 'Nanonis'):
@@ -120,10 +133,11 @@ def read_spectra(paths, source = 'Nanonis'):
     """
     if paths[0].endswith(".dat"):
         spectra = list(map(lambda p: read_spectrum(p, source), paths))
+        spectra = [read_spectrum(path, source) for path in paths]
     elif paths[0].endswith(".csv"):
-        spectra = list(map(lambda p: read_spectrum(p, source=None, sep=','), paths))
-    elif paths[0].endswith(".3ds"):
-        spectra = []
+        spectra = [read_spectrum(path, source=None, sep=',') for path in paths]
+    elif paths[0].endswith(".npy"):
+        spectra = [np.load(path) for path in paths]
     else:
         raise ValueError(FILETYPE_ERROR)
 
