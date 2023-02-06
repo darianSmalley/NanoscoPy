@@ -34,11 +34,11 @@ def basic_flatten(image, poly=True):
     im = line_flatten(im.data)
     return im
 
-def basic_correction(image, poly, CLAHE=True):
+def basic_correction(image, poly, equalize=True):
     ''' basic flatten, then rescale to [0,255] as uint8, then equalize, finaly smooth.'''
     im = basic_flatten(image, poly)
     im = rescale(im)
-    if CLAHE: im = CLAHE(im)
+    if equalize: im = CLAHE(im)
     im = cv2.GaussianBlur(im,(3,3), cv2.BORDER_DEFAULT)
     return im
 
@@ -57,12 +57,12 @@ def flatten(images):
     
     return output
 
-def correct(images, terrace=False):
+def correct(images, terrace=False, poly=True, equalize=True):
     output = []
     n = len(images)
     for i, image in enumerate(images):
         try:
-            corrected = basic_correction(image, False, False)
+            corrected = basic_correction(image, poly, equalize)
 
             if terrace: 
                 corrected = terrace_level(corrected)
@@ -73,6 +73,7 @@ def correct(images, terrace=False):
         except Exception as error:
             print(error)
             output.append(image)
+
     print('')
     return output
 

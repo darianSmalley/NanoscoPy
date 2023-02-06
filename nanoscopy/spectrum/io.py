@@ -1,9 +1,9 @@
-import pandas as pd
 import os
 import glob
 import numpy as np
+import pandas as pd
 
-from .spectrum import Spectrum
+from .spectrum import Spectrum, STS
 
 sts_ext = tuple(['.dat', '.3ds'])
 FILES_NOT_FOUND_ERROR = "No files found."
@@ -59,7 +59,7 @@ def read_STS(path, source = 'Nanonis', sep = '\t'):
     # Drop any rows that contain any NaN values
     data = data.dropna(axis=0, how='any')
 
-    spectrum = Spectrum(data, metadata, filepath=path)
+    spectrum = STS(data, metadata, filepath=path)
 
     return spectrum
 

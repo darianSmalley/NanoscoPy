@@ -365,7 +365,7 @@ def read_mtrx_v2(path):
     except Exception as error:
         raise
 
-def read_mtrx(path):
+def read_mtrx(path, metadata_source):
     """
     Imports tabular data from a text file.
 
@@ -387,17 +387,33 @@ def read_mtrx(path):
             'Current': glob.glob(str(I_path))
         }
 
-        # Add records of important scan parameters
         full_path = Path(path).with_suffix('')
-        material = full_path.parts[-4]
-        growth_params = full_path.parts[-3]
-        scan_date = full_path.parts[-2]
-        sample_id = '_'.join([material, growth_params])
-
-        filename = full_path.parts[-1]
+        filename = full_path.name
         filename_parts = filename.split('--')
+        # rec_index_1 = filename_parts[-2]
+        # rec_index_2 = filename_parts[-1]
+        # rec_index = f'{rec_index_1}-{rec_index_2}' 
         rec_index = filename_parts[-1]
+        date_format = '%Y-%m-%d'
 
+        # Add records of important scan parameters
+        if metadata_source == 'filepath':
+            material = full_path.parts[-4]
+            growth_params = full_path.parts[-3]
+            sample_id = '_'.join([material, growth_params])
+            scan_date = full_path.parts[-2]
+            datetime_object = datetime.strptime(scan_date, date_format)
+            datetime_iso = datetime_object.isoformat()
+        elif metadata_source == 'filename':
+            scan_date = filename_parts[-3]
+            bias = filename_parts[-4]
+            growth_params = filename_parts[-5]
+            crystal_batch = filename_parts[-6]
+            material = filename_parts[-7]
+            sample_id = '_'.join([material, crystal_batch, growth_params])
+            datetime_object = datetime.strptime(scan_date, date_format)
+            datetime_iso = datetime_object.isoformat()
+        
         probe = 'WTip'
 
         dfs = []
@@ -408,46 +424,46 @@ def read_mtrx(path):
                 mtrx = access2thematrix.MtrxData()    
                 rasters, message = mtrx.open(channel_path)
 
-                # Retreive records of important scan parameters
-                setpoint, setpoint_unit = mtrx.param['EEPA::Regulator.Setpoint_1']
-                bias, _ = mtrx.param['EEPA::GapVoltageControl.Voltage']
-                width, _ = mtrx.param['EEPA::XYScanner.Width']
-                height, _ = mtrx.param['EEPA::XYScanner.Height']
-                relocation_step, _ = mtrx.param['EEPA::XYScanner.Relocation_Step_Limit']
-                relocation_time, _ = mtrx.param['EEPA::XYScanner.Relocation_Time_Limit']
-                raster_time, _ = mtrx.param['EEPA::XYScanner.Raster_Time']
-                speed = width/raster_time
-
-                # Get and convert date/time stamp
-                # datetime_string = mtrx.param['BKLT']
-                # datetime_object = datetime.strptime(datetime_string, '%A, %d %B %Y %H:%M:%S')
-                datetime_object = datetime.strptime(scan_date, '%Y-%m-%d')
-
                 # Add important scan parameters to SPMimage
                 for _, raster in rasters.items():
+                    formatted_data = dict.fromkeys(SPMImage.data_headers)
                     trace, direction = raster.split('/')
                     mtrx_image, message = mtrx.select_image(raster)
                     nan_mask = ~np.isnan(mtrx_image.data)
                     mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
 
-                    data = [
-                        sample_id,
-                        rec_index,
-                        probe,
-                        channel,
-                        direction,
-                        trace,
-                        setpoint,
-                        bias,
-                        width,
-                        height,
-                        raster_time,
-                        datetime_object.isoformat(),
-                        path,
-                        mtrx_image
-                    ]
+                    
+                    formatted_data['rec_index'] = rec_index
+                    formatted_data['probe'] = probe
+                    formatted_data['channel'] = channel
+                    formatted_data['direction'] = direction
+                    formatted_data['trace'] = trace
+                    formatted_data['path'] = path
+                    formatted_data['image'] = mtrx_image
 
-                    formatted_data = dict(zip(SPMImage.data_headers, data))
+                    if sample_id: formatted_data['sample_id'] = sample_id
+                    if datetime_iso: formatted_data['datetime'] = datetime_iso
+
+                    try:
+                        # Retreive records of important scan parameters
+                        setpoint, setpoint_unit = mtrx.param['EEPA::Regulator.Setpoint_1']
+                        bias, _ = mtrx.param['EEPA::GapVoltageControl.Voltage']
+                        width, _ = mtrx.param['EEPA::XYScanner.Width']
+                        height, _ = mtrx.param['EEPA::XYScanner.Height']
+                        relocation_step, _ = mtrx.param['EEPA::XYScanner.Relocation_Step_Limit']
+                        relocation_time, _ = mtrx.param['EEPA::XYScanner.Relocation_Time_Limit']
+                        raster_time, _ = mtrx.param['EEPA::XYScanner.Raster_Time']
+                        speed = width/raster_time
+
+                        formatted_data['setpoint (A)'] = setpoint
+                        formatted_data['voltage (V)'] = bias
+                        formatted_data['width (m)'] = width
+                        formatted_data['height (m)'] = height
+                        formatted_data['scan_time (s)'] = raster_time
+
+                    except KeyError as e:
+                        print(f'\nKeyError: {str(e)}')
+
                     df = pd.DataFrame([formatted_data])
                     dfs.append(df)
 
@@ -461,7 +477,7 @@ def read_mtrx(path):
     except Exception as error:
         raise
 
-def read(path, filename_filter = ''):
+def read(path, filename_filter = '', metadata_source = None):
     """
     Imports microscopy image data from Nanonis (.sxm) and Omicron (.Z_mtrx, .I_mtrx) files.
 
@@ -480,7 +496,7 @@ def read(path, filename_filter = ''):
             # clean path of extensions
             path = Path(path).with_suffix('')
             # add to list as single image
-            data = [read_mtrx(path)]
+            data = [read_mtrx(path, metadata_source)]
         else:
             raise ValueError(FILETYPE_ERROR)
     else:
@@ -501,31 +517,33 @@ def read(path, filename_filter = ''):
         
         # Get all files with sxm extension and extend data list
         sxms = list(filter(lambda p: p.endswith('sxm'), paths))
-        if len(sxms):
-            print(f'Reading {len(sxms)} sxm files...', end="", flush=True)
+        n_sxms = len(sxms)
+        if n_sxms:
+            progbar(i+1, n_mtrxs, 10, f'Reading {n_sxms} sxm images...Done' if i+1==n_sxms else f'Reading {n_sxms} sxm images...')
             sxm_data = list(map(read_sxm, sxms))
             data.extend(sxm_data)
-            print('DONE')
+            print('')
 
         # Get all files with Z or I mtrx extension and extend data list
         mtrxs = list(filter(lambda p: p.endswith('Z_mtrx'), paths))
-        if len(mtrxs):
+        n_mtrxs = len(mtrxs)
+        if n_mtrxs:
             # convert list of absolute paths to set of unique file names 
             # mtrxs = set(map(lambda path: Path(path).stem, mtrxs))
-            print(f'Reading {len(mtrxs)} mtrx files...', end="", flush=True)
             
             # Combine Z and I mtrx files into single SPMimages
-            for file_name in mtrxs:
+            for i, file_name in enumerate(mtrxs):
+                progbar(i+1, n_mtrxs, 10, f'Reading {n_mtrxs} mtrx images...Done' if i+1==n_mtrxs else f'Reading {n_mtrxs} mtrx images...')
                 # file_path = os.path.join(path, file_name)
-                mtrx_image = read_mtrx(file_name)
+                mtrx_image = read_mtrx(file_name, metadata_source)
                 data.append(mtrx_image)
 
-            print('DONE')
+            print('')
 
     return data
 
 def export_images(images, dst_paths = ['./'], ext = 'jpg', 
-               scan_dir = 'up', cmap = 'gray'):
+                scan_dir = 'up', cmap = 'gray'):
     """
     Exports image from numpy array
 

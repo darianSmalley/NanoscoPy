@@ -24,6 +24,8 @@ class SPMImage():
         'image'
     ]
 
+    data_dict = {key: None for key in data_headers}
+
     def __init__(self, dataframe,  metadata) -> None:
         self.metadata = metadata
         self.dataframe = dataframe
@@ -32,9 +34,12 @@ class SPMImage():
         sample_id = self.dataframe.at[0, 'sample_id']
         rec_index = self.dataframe.at[0, 'rec_index']
         channel = self.dataframe.at[0, 'channel']
-        datetime_obj = datetime.fromisoformat(self.dataframe.at[0, 'datetime'])
-        date = datetime_obj.strftime('%y%m%d')
-        # date = self.dataframe.at[0, 'datetime']
+        datetime_str = self.dataframe.at[0, 'datetime']
+        if datetime_str:
+            datetime_obj = datetime.fromisoformat(datetime_str)
+            date = datetime_obj.strftime('%y%m%d')
+        else:
+            date = ""
         bias = self.dataframe.at[0, 'voltage (V)']
         size = round(self.dataframe.at[0, 'width (m)'] * pow(10,9))
         # return f"{sample_id}_{date}_{bias}V_{size}x{size}_{channel}"
