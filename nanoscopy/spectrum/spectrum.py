@@ -146,20 +146,13 @@ class STS(Spectrum):
         else: 
             self.dataframe = self.dataframe.rename(columns={self.dataframe.columns[1]: self.dIdV_label})
             self.dIdV = self.dataframe.iloc[:, 1]
+            self.integrate_current()
+            self.calculate_ndc()
 
         if (self.dIdV < 0).any(): 
             self.offset_correction()
 
-    def set_bias_label(self, label):
-        self.b_label = label
-
-    def set_dIdV_label(self, label):
-        self.dIdV_label = label
-
-    def get_signal(self, signal_label):
-        return self.dataframe[signal_label]
-
-    def mean_signal(self, col_idx):
+    def _mean_signal(self, col_idx):
         """
         Returns average signal from repeated STS measurements as a Pandas Series.
         select all columns from col_idx to end of columns
@@ -171,6 +164,35 @@ class STS(Spectrum):
         mean_signal = self.dataframe.iloc[:, col_idx::2].cumsum(axis=1).iloc[:, -1] / (self.m / 2)
 
         return mean_signal
+
+    def _calculate_ndc(self):
+        self.integrate_current()
+        self.ndc = self.dIdV * (self.bias/self.current)
+
+    def _offset_correction(self):
+        # shift values up so the min is set to zero
+        self.dIdV = self.dIdV + abs(self.dIdV.min())
+
+    def _integrate_current(self):
+        current = integrate.cumulative_trapezoid(self.dIdV, initial=0)
+        # find all the data points which lie in the bandgap
+        gap_points = current[self.dIdV.index[self.dIdV == 0]]
+
+        if len(gap_points) > 0:
+            zero_point = gap_points[0]
+            # re-scale current so the band gap has zero amplitude
+            self.current = current - zero_point
+        else:
+            self.current = current
+
+    def get_signal(self, signal_label):
+        return self.dataframe[signal_label]
+
+    def set_bias_label(self, label):
+        self.b_label = label
+
+    def set_dIdV_label(self, label):
+        self.dIdV_label = label
 
     def set_mean_signals(self):   
         bias = self.bias      
@@ -189,22 +211,32 @@ class STS(Spectrum):
         self.dIdV = dIdV
         self.ndc = ndc
 
-    def offset_correction(self):
-        # shift values up so the min is set to zero
-        self.dIdV = self.dIdV + abs(self.dIdV.min())
+    def preprocess(self, n, norm=True):
+        current = np.array(self.current)
+        dIdV = np.array(self.dIdV)
+        ndc = np.array(self.ndc)
 
-    def integrate_current(self):
-        current = integrate.cumulative_trapezoid(self.dIdV, initial=0)
-        # find all the data points which lie in the bandgap
-        gap_points = current[self.dIdV.index[self.dIdV == 0]]
-        zero_point = gap_points[0]
-        # re-scale current so the band gap has zero amplitude
-        self.current = current - zero_point
+        if norm: 
+            dIdV = normalize(dIdV)
+            current = normalize(current)
+            ndc = normalize(ndc)
 
-    def calculate_ndc(self):
-        self.integrate_current()
-        self.ndc = self.dIdV * (self.bias/self.current)
+        fill_value = 0
+        f = interpolate.interp1d(self.bias, dIdV, bounds_error=False, fill_value=fill_value)
+        g = interpolate.interp1d(self.bias, current, bounds_error=False, fill_value=fill_value)
+        h = interpolate.interp1d(self.bias, ndc, bounds_error=False, fill_value=fill_value)
 
+        # new_bias = new_range(self.bias.min(), self.bias.max(), step, zero_centered=False)
+        new_bias = np.linspace(self.bias.min(), self.bias.max(), n)
+        new_bias = np.round(new_bias, 3)
+        # print(new_bias.shape)
+
+        new_dIdV = f(new_bias)
+        new_current = g(new_bias)
+        new_ndc = h(new_bias)
+
+        return new_bias, new_dIdV, new_current, new_ndc
+        
     def preprocess_dIdV(self, new_bias, norm = True, extrapolate = False, zero_gap = False):
         bias = np.array(self.bias)
         dIdV = np.array(self.dIdV)
@@ -281,29 +313,3 @@ class STS(Spectrum):
         self.new_dIdV = new_dIdV
 
         return new_dIdV, new_current, new_ndc
-
-    def preprocess(self, n, norm=True):
-        current = np.array(self.current)
-        dIdV = np.array(self.dIdV)
-        ndc = np.array(self.ndc)
-
-        if norm: 
-            dIdV = normalize(dIdV)
-            current = normalize(current)
-            ndc = normalize(ndc)
-
-        fill_value = 0
-        f = interpolate.interp1d(self.bias, dIdV, bounds_error=False, fill_value=fill_value)
-        g = interpolate.interp1d(self.bias, current, bounds_error=False, fill_value=fill_value)
-        h = interpolate.interp1d(self.bias, ndc, bounds_error=False, fill_value=fill_value)
-
-        # new_bias = new_range(self.bias.min(), self.bias.max(), step, zero_centered=False)
-        new_bias = np.linspace(self.bias.min(), self.bias.max(), n)
-        new_bias = np.round(new_bias, 3)
-        # print(new_bias.shape)
-
-        new_dIdV = f(new_bias)
-        new_current = g(new_bias)
-        new_ndc = h(new_bias)
-
-        return new_bias, new_dIdV, new_current, new_ndc
