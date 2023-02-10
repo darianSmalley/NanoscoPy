@@ -18,7 +18,7 @@ fwd_scan = scan.dataframe.at[0, 'image']
 # Correct each image by globally flattened via plane correction, followed by 2nd order polynomial background subtraction, line-by-line offset flattening, 3x3 gaussian smoothing, and contrast limited adaptive histogram equilization.
 corrected_scan = spm.correct(fwd_scan, poly=True, equalize=True)
 
-# Show flattened image 
+# Show corrected image 
 plt.imshow(corrected_scan)
 plt.show()
 ```
