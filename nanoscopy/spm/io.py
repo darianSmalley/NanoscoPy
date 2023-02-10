@@ -10,15 +10,16 @@ from pathlib import Path
 import pprint
 
 from .SPMImage import SPMImage
-from ..utilities import progbar
+from ..utilities import progbar, try_parsing_date
 
 DEBUG = False
 
 spm_ext = tuple(['.sxm', '.Z_mtrx'])
-CHANNELS = ['Z' , 'Current']
+CHANNELS = ['Z', 'Current']
 TRACES = ['forward', 'backward']
 FILES_NOT_FOUND_ERROR = "No files found."
 FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only sxm and Z_mtrx are supported."
+
 
 def read_sxm(path):
     """
@@ -26,7 +27,7 @@ def read_sxm(path):
 
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
-    
+
     Outputs:
         data: SPMImage. Contains the imported data. 
     """
@@ -59,25 +60,26 @@ def read_sxm(path):
         date = sxm.header['REC_DATE'][0][0]
         time = sxm.header['REC_TIME'][0][0]
         datetime_string = date + ' ' + time
-        datetime_object = datetime.strptime(datetime_string, '%d.%m.%Y %H:%M:%S')
+        datetime_object = datetime.strptime(
+            datetime_string, '%d.%m.%Y %H:%M:%S')
 
         dfs = []
         for channel in CHANNELS:
             for trace in TRACES:
-                sxm_data = sxm.get_channel(channel, direction = trace).pixels
+                sxm_data = sxm.get_channel(channel, direction=trace).pixels
                 nan_mask = ~np.isnan(sxm_data)
                 img_data = np.where(nan_mask, sxm_data, 0)
                 # pySPM seems to flip the image to put the origin in the bottom left corner
                 # flip again to correct
                 if direction == 'up':
                     img_data = np.flipud(img_data)
-                
+
                 # if (channel == 'Z') and (trace == 'forward'):
                 #     plt.imshow(img_data)
 
                 data = [
                     sample_id,
-                    rec_index, 
+                    rec_index,
                     probe,
                     channel,
                     direction,
@@ -91,7 +93,7 @@ def read_sxm(path):
                     path,
                     img_data
                 ]
-                
+
                 formatted_data = dict(zip(SPMImage.data_headers, data))
                 df = pd.DataFrame([formatted_data])
                 dfs.append(df)
@@ -107,13 +109,14 @@ def read_sxm(path):
         print('Error detected:', error)
         raise
 
+
 def read_sxm_v1(path):
     """
     Need to update this docstring
 
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
-    
+
     Outputs:
         data: SPMImage. Contains the imported data. 
     """
@@ -144,17 +147,18 @@ def read_sxm_v1(path):
         date = sxm.header['REC_DATE'][0][0]
         time = sxm.header['REC_TIME'][0][0]
         datetime_string = date + ' ' + time
-        datetime_object = datetime.strptime(datetime_string, '%d.%m.%Y %H:%M:%S')
+        datetime_object = datetime.strptime(
+            datetime_string, '%d.%m.%Y %H:%M:%S')
 
         # Create SPMImage class object
         image = SPMImage(path)
         image.add_param('bias', bias)
         image.add_param('channels', channels)
-        image.add_param('date_time' , datetime_object)
+        image.add_param('date_time', datetime_object)
         image.add_param('width', width)
         image.add_param('height', height)
         image.add_param('setpoint_value', setpoint_value)
-        image.add_param('setpoint_unit', setpoint_unit) 
+        image.add_param('setpoint_unit', setpoint_unit)
         image.add_param('scan_direction', scan_direction)
         image.add_param('probe', probe)
         image.add_param('sample_id', sample_id)
@@ -165,7 +169,7 @@ def read_sxm_v1(path):
         # Get data and store in SPMImage class
         for channel in CHANNELS:
             for trace in TRACES:
-                data = sxm.get_channel(channel, direction = trace).pixels
+                data = sxm.get_channel(channel, direction=trace).pixels
                 nan_mask = ~np.isnan(data)
                 data = np.where(nan_mask, data, 0)
                 image.add_data(channel, data)
@@ -177,6 +181,7 @@ def read_sxm_v1(path):
         print('Error detected:', error)
         raise
 
+
 def read_mtrx_v1(path):
     """
     Imports tabular data from a text file.
@@ -184,21 +189,21 @@ def read_mtrx_v1(path):
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
+
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    try: 
+    try:
         # TODO: check if path has extension and remove it
 
-        # Get I and Z mtrx file paths for this image.   
+        # Get I and Z mtrx file paths for this image.
         Z_path = f'{path}.Z_mtrx'
         I_path = f'{path}.I_mtrx'
         mtrx_channels = {
             'Z': glob.glob(Z_path),
             'Current': glob.glob(I_path)
         }
-        
+
         print('Found the following mtrx files in path:')
         # pprint.pprint(mtrx_channels)
         print(f'Processing {Path(path).stem}...', end="", flush=True)
@@ -222,7 +227,7 @@ def read_mtrx_v1(path):
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
                 # Create mtrx class to access data
-                mtrx = access2thematrix.MtrxData()    
+                mtrx = access2thematrix.MtrxData()
                 rasters, message = mtrx.open(channel_path)
 
                 # Retreive records of important scan parameters
@@ -233,7 +238,8 @@ def read_mtrx_v1(path):
 
                 # Get and convert date/time stamp
                 datetime_string = mtrx.param['BKLT']
-                datetime_object = datetime.strptime(datetime_string, '%A, %d %B %Y %H:%M:%S')
+                datetime_object = datetime.strptime(
+                    datetime_string, '%A, %d %B %Y %H:%M:%S')
 
                 # Add important scan parameters to SPMimage
                 image.add_param('setpoint_value', setpoint)
@@ -241,7 +247,7 @@ def read_mtrx_v1(path):
                 image.add_param('bias', voltage)
                 image.add_param('width', scan_width)
                 image.add_param('height', scan_height)
-                image.add_param('date_time' , datetime_object)
+                image.add_param('date_time', datetime_object)
                 image.set_headers(mtrx.param)
 
                 for _, raster in rasters.items():
@@ -263,13 +269,14 @@ def read_mtrx_v1(path):
                     data['datetimes'].append(datetime_string)
                     data['paths'].append(channel_path)
                     data['images'].append(np.array(mtrx_image.data))
-        
+
         dataframe = pd.DataFrame(data)
         image.add_dataframe(dataframe)
         return image
 
     except Exception as error:
         raise
+
 
 def read_mtrx_v2(path):
     """
@@ -278,20 +285,22 @@ def read_mtrx_v2(path):
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
+
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    try: 
-        if DEBUG: print(path)
-        # Get I and Z mtrx file paths for this image.   
+    try:
+        if DEBUG:
+            print(path)
+        # Get I and Z mtrx file paths for this image.
         Z_path = f'{path}.Z_mtrx'
         I_path = f'{path}.I_mtrx'
         mtrx_channels = {
             'Z': glob.glob(Z_path),
             'Current': glob.glob(I_path)
         }
-        if DEBUG: pprint.pprint(mtrx_channels)
+        if DEBUG:
+            pprint.pprint(mtrx_channels)
         probe = 'WTip'
 
         # Add records of important scan parameters
@@ -309,7 +318,7 @@ def read_mtrx_v2(path):
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
                 # Create mtrx class to access data
-                mtrx = access2thematrix.MtrxData()    
+                mtrx = access2thematrix.MtrxData()
                 rasters, message = mtrx.open(channel_path)
 
                 # Retreive records of important scan parameters
@@ -365,6 +374,7 @@ def read_mtrx_v2(path):
     except Exception as error:
         raise
 
+
 def read_mtrx(path, metadata_source):
     """
     Imports tabular data from a text file.
@@ -372,14 +382,15 @@ def read_mtrx(path, metadata_source):
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
+
     Outputs:
         data: numpy array. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    try: 
-        if DEBUG: print(path)
+    try:
+        if DEBUG:
+            print(path)
 
-        # Get I and Z mtrx file paths for this image.   
+        # Get I and Z mtrx file paths for this image.
         Z_path = Path(path).with_suffix('.Z_mtrx')
         I_path = Path(path).with_suffix('.I_mtrx')
         mtrx_channels = {
@@ -392,9 +403,8 @@ def read_mtrx(path, metadata_source):
         filename_parts = filename.split('--')
         # rec_index_1 = filename_parts[-2]
         # rec_index_2 = filename_parts[-1]
-        # rec_index = f'{rec_index_1}-{rec_index_2}' 
+        # rec_index = f'{rec_index_1}-{rec_index_2}'
         rec_index = filename_parts[-1]
-        date_format = '%Y-%m-%d'
 
         # Add records of important scan parameters
         if metadata_source == 'filepath':
@@ -402,7 +412,7 @@ def read_mtrx(path, metadata_source):
             growth_params = full_path.parts[-3]
             sample_id = '_'.join([material, growth_params])
             scan_date = full_path.parts[-2]
-            datetime_object = datetime.strptime(scan_date, date_format)
+            datetime_object = try_parsing_date(scan_date)
             datetime_iso = datetime_object.isoformat()
         elif metadata_source == 'filename':
             scan_date = filename_parts[-3]
@@ -411,9 +421,9 @@ def read_mtrx(path, metadata_source):
             crystal_batch = filename_parts[-6]
             material = filename_parts[-7]
             sample_id = '_'.join([material, crystal_batch, growth_params])
-            datetime_object = datetime.strptime(scan_date, date_format)
+            datetime_object = try_parsing_date(scan_date)
             datetime_iso = datetime_object.isoformat()
-        
+
         probe = 'WTip'
 
         dfs = []
@@ -421,7 +431,7 @@ def read_mtrx(path, metadata_source):
         for channel, channel_paths in mtrx_channels.items():
             for channel_path in channel_paths:
                 # Create mtrx class to access data
-                mtrx = access2thematrix.MtrxData()    
+                mtrx = access2thematrix.MtrxData()
                 rasters, message = mtrx.open(channel_path)
 
                 # Add important scan parameters to SPMimage
@@ -432,7 +442,6 @@ def read_mtrx(path, metadata_source):
                     nan_mask = ~np.isnan(mtrx_image.data)
                     mtrx_image = np.where(nan_mask, mtrx_image.data, 0)
 
-                    
                     formatted_data['rec_index'] = rec_index
                     formatted_data['probe'] = probe
                     formatted_data['channel'] = channel
@@ -441,8 +450,10 @@ def read_mtrx(path, metadata_source):
                     formatted_data['path'] = path
                     formatted_data['image'] = mtrx_image
 
-                    if sample_id: formatted_data['sample_id'] = sample_id
-                    if datetime_iso: formatted_data['datetime'] = datetime_iso
+                    if sample_id:
+                        formatted_data['sample_id'] = sample_id
+                    if datetime_iso:
+                        formatted_data['datetime'] = datetime_iso
 
                     try:
                         # Retreive records of important scan parameters
@@ -477,13 +488,14 @@ def read_mtrx(path, metadata_source):
     except Exception as error:
         raise
 
-def read(path, filename_filter = '', metadata_source = None):
+
+def read(path, filename_filter='', metadata_source=None):
     """
     Imports microscopy image data from Nanonis (.sxm) and Omicron (.Z_mtrx, .I_mtrx) files.
 
     Inputs:
         path: A path-like object representing a file system path. A path-like object is either a string or bytes object representing a path.
-    
+
     Outputs:
         data: list of SPMiamges. Contains the imported data and select metadata. 
     """
@@ -501,25 +513,28 @@ def read(path, filename_filter = '', metadata_source = None):
             raise ValueError(FILETYPE_ERROR)
     else:
         # if path points to a folder, get all paths in folder according to filter
-        paths = glob.glob(os.path.join(path, f'**/*{filename_filter}*.*'), recursive=True)
+        paths = glob.glob(os.path.join(
+            path, f'**/*{filename_filter}*.*'), recursive=True)
         paths = sorted(paths)
         n = len(paths)
-        
-        # Check if any files were found
-        if n == 0: raise ValueError(FILES_NOT_FOUND_ERROR)
 
-        if DEBUG: 
+        # Check if any files were found
+        if n == 0:
+            raise ValueError(FILES_NOT_FOUND_ERROR)
+
+        if DEBUG:
             print(n, 'paths found.')
             pprint.pprint(paths)
 
         # Create empty data list
         data = []
-        
+
         # Get all files with sxm extension and extend data list
         sxms = list(filter(lambda p: p.endswith('sxm'), paths))
         n_sxms = len(sxms)
         if n_sxms:
-            progbar(i+1, n_mtrxs, 10, f'Reading {n_sxms} sxm images...Done' if i+1==n_sxms else f'Reading {n_sxms} sxm images...')
+            progbar(i+1, n_mtrxs, 10, f'Reading {n_sxms} sxm images...Done' if i +
+                    1 == n_sxms else f'Reading {n_sxms} sxm images...')
             sxm_data = list(map(read_sxm, sxms))
             data.extend(sxm_data)
             print('')
@@ -528,12 +543,13 @@ def read(path, filename_filter = '', metadata_source = None):
         mtrxs = list(filter(lambda p: p.endswith('Z_mtrx'), paths))
         n_mtrxs = len(mtrxs)
         if n_mtrxs:
-            # convert list of absolute paths to set of unique file names 
+            # convert list of absolute paths to set of unique file names
             # mtrxs = set(map(lambda path: Path(path).stem, mtrxs))
-            
+
             # Combine Z and I mtrx files into single SPMimages
             for i, file_name in enumerate(mtrxs):
-                progbar(i+1, n_mtrxs, 10, f'Reading {n_mtrxs} mtrx images...Done' if i+1==n_mtrxs else f'Reading {n_mtrxs} mtrx images...')
+                progbar(i+1, n_mtrxs, 10, f'Reading {n_mtrxs} mtrx images...Done' if i +
+                        1 == n_mtrxs else f'Reading {n_mtrxs} mtrx images...')
                 # file_path = os.path.join(path, file_name)
                 mtrx_image = read_mtrx(file_name, metadata_source)
                 data.append(mtrx_image)
@@ -542,26 +558,30 @@ def read(path, filename_filter = '', metadata_source = None):
 
     return data
 
-def export_images(images, dst_paths = ['./'], ext = 'jpg', 
-                scan_dir = 'up', cmap = 'gray'):
+
+def export_images(images, dst_paths=['./'], ext='jpg',
+                  scan_dir='up', cmap='gray'):
     """
     Exports image from numpy array
 
     Inputs:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
         src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
-    
+
     Outputs:
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    if not isinstance(images, list): images = [images]
-    if not isinstance(dst_paths, list): dst_paths = [dst_paths]
+    if not isinstance(images, list):
+        images = [images]
+    if not isinstance(dst_paths, list):
+        dst_paths = [dst_paths]
 
     for image, dst_path in zip(images, dst_paths):
         origin = 'lower' if scan_dir == 'up' else 'upper'
         plt.imsave(dst_path, image, cmap=cmap, origin=origin)
 
-def export_metadata(images, dst_path = './'):
+
+def export_metadata(images, dst_path='./'):
     metadata = [image.dataframe.drop('image', axis=1) for image in images]
     metadata = pd.concat(metadata)
     metadata.to_csv(os.path.join(dst_path, 'metadata_out.csv'), index=False)
