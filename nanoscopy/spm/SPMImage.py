@@ -31,11 +31,17 @@ class SPMImage():
         self.metadata = metadata
         self.dataframe = dataframe
 
+    def bwd(self):
+        return self.dataframe.at[1, 'image']
+
     def fwd(self):
         return self.dataframe.at[0, 'image']
 
-    def bwd(self):
-        return self.dataframe.at[1, 'image']
+    def path(self):
+        return self.dataframe.at[0, 'path']
+
+    def sample_id(self):
+        return self.dataframe.at[0, 'sample_id']
 
     def summary(self):
         sample_id = self.dataframe.at[0, 'sample_id']

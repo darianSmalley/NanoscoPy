@@ -408,9 +408,10 @@ def read_mtrx(path, metadata_source):
 
         # Add records of important scan parameters
         if metadata_source == 'filepath':
-            material = full_path.parts[-4]
-            growth_params = full_path.parts[-3]
-            sample_id = '_'.join([material, growth_params])
+            # material = full_path.parts[-4]
+            # growth_params = full_path.parts[-3]
+            # sample_id = '_'.join([material, growth_params])
+            sample_id = full_path.parts[-3]
             scan_date = full_path.parts[-2]
             datetime_object = try_parsing_date(scan_date)
             datetime_iso = datetime_object.isoformat()
