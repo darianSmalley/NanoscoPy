@@ -13,7 +13,7 @@ filepath_sxm = '../ExampleDataFiles/STM_Au-111_Flat.sxm'
 scan = spm.read(filepath_sxm)
 
 # Select the forward pass of the height channel from the data
-fwd_scan = scan.dataframe.at[0, 'image']
+fwd_scan = scan.fwd()
 
 # Correct each image by globally flattened via plane correction, 
 # followed by 2nd order polynomial background subtraction, 
