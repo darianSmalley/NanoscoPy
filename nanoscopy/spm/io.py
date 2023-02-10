@@ -401,9 +401,6 @@ def read_mtrx(path, metadata_source):
         full_path = Path(path).with_suffix('')
         filename = full_path.name
         filename_parts = filename.split('--')
-        # rec_index_1 = filename_parts[-2]
-        # rec_index_2 = filename_parts[-1]
-        # rec_index = f'{rec_index_1}-{rec_index_2}'
         rec_index = filename_parts[-1]
 
         # Add records of important scan parameters
