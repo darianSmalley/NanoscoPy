@@ -3,21 +3,22 @@ An open source repo for the analysis of experimental microscopy data common in m
 
 ## Example Usage
 ```python
-import nanoscopy as nano
+from nanoscopy import spm
 import matplotlib.pyplot as plt
 
-# Specify the file to be imported
+# Specify the SXM or MTRX file to be imported
 filepath_sxm = '../ExampleDataFiles/STM_Au-111_Flat.sxm'
 
 # Read the data
-scan = nano.spm.io.read(filepath_sxm)[0]
+scan = spm.read(filepath_sxm)
 
 # Select the forward pass of the height channel from the data
-image = scan.data['Z'][0]
+fwd_scan = scan.dataframe.at[0, 'image']
 
-# Correct the data
-flattened_image = nano.spm.process.basic_flatten(image)
+# Correct each image by globally flattened via plane correction, followed by 2nd order polynomial background subtraction, line-by-line offset flattening, 3x3 gaussian smoothing, and contrast limited adaptive histogram equilization.
+corrected_scan = spm.correct(fwd_scan, poly=True, equalize=True)
 
 # Show flattened image 
-plt.imshow(flattened_image)
+plt.imshow(corrected_scan)
+plt.show()
 ```
