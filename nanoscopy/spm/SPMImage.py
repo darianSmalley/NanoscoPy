@@ -6,6 +6,7 @@ import pandas as pd
 CHANNEL_ERROR = 'Channel not supported.'
 DIRECTION_ERROR = 'Direction not supported.'
 
+
 class SPMImage():
     data_headers = [
         'sample_id',
@@ -30,6 +31,12 @@ class SPMImage():
         self.metadata = metadata
         self.dataframe = dataframe
 
+    def fwd(self):
+        return self.dataframe.at[0, 'image']
+
+    def bwd(self):
+        return self.dataframe.at[1, 'image']
+
     def summary(self):
         sample_id = self.dataframe.at[0, 'sample_id']
         rec_index = self.dataframe.at[0, 'rec_index']
@@ -41,19 +48,20 @@ class SPMImage():
         else:
             date = ""
         bias = self.dataframe.at[0, 'voltage (V)']
-        size = round(self.dataframe.at[0, 'width (m)'] * pow(10,9))
+        size = round(self.dataframe.at[0, 'width (m)'] * pow(10, 9))
         # return f"{sample_id}_{date}_{bias}V_{size}x{size}_{channel}"
         return f"{sample_id}_{date}_{bias}V_{size}x{size}_{rec_index}_{channel}"
+
 
 class SPMImage_dict(MutableMapping):
     def __init__(self, path='', *args, **kwargs):
         self.path = path
         self.params = dict()
         self.headers = dict()
-        self.data = {'Z':[], 'Current':[]}
-        self.traces = {'Z':[], 'Current':[]}
+        self.data = {'Z': [], 'Current': []}
+        self.traces = {'Z': [], 'Current': []}
         self.update(*args, **kwargs)
-    
+
     def reformate(self, channel):
         cols = [
             'sample_id',
@@ -69,7 +77,7 @@ class SPMImage_dict(MutableMapping):
             'trace',
             'image'
         ]
-        data = {col:[] for col in cols}
+        data = {col: [] for col in cols}
         n = len(self.data[channel])
 
         for i in range(n):
@@ -94,7 +102,7 @@ class SPMImage_dict(MutableMapping):
         I_data = self.reformate('Current')
         I_dataframe = pd.DataFrame(I_data)
 
-        return pd.concat([Z_dataframe,I_dataframe])
+        return pd.concat([Z_dataframe, I_dataframe])
 
     def add_param(self, param, value):
         self.params[param] = value
@@ -102,7 +110,7 @@ class SPMImage_dict(MutableMapping):
     def add_data(self, channel, data):
         if channel not in self.data:
             self.data[channel] = []
-            
+
         self.data[channel].append(data)
 
     def add_trace(self, channel, direction, trace):
@@ -116,7 +124,7 @@ class SPMImage_dict(MutableMapping):
 
     def get_data(self, channel):
         return dict(zip(self.traces[channel], self.data[channel]))
-    
+
     def set_headers(self, headers):
         self.headers = headers
 
@@ -124,19 +132,23 @@ class SPMImage_dict(MutableMapping):
         sample_id = self.params['sample_id']
         date = self.params['date_time'].strftime('%y%m%d')
         bias = self.params['bias']
-        size = round(self.params['width'] * pow(10,9))
+        size = round(self.params['width'] * pow(10, 9))
         rec_index = self.params['rec_index']
         return f"{sample_id}_{date}_{bias}V_{size}x{size}_Z_{rec_index}"
 
     # The next five methods are requirements of the collection
     def __setitem__(self, key, value):
         self.add_data(key, value)
+
     def __getitem__(self, key):
         return self.data[key]
+
     def __delitem__(self, key):
         del self.data[key]
+
     def __iter__(self):
         return iter(self.data)
+
     def __len__(self):
         return len(self.data)
 
@@ -145,7 +157,8 @@ class SPMImage_dict(MutableMapping):
         '''returns simple dict representation of the mapping'''
         # return ', '.join("%s: %s" % item for item in vars(self).items())
         return f'Path: {self.path}\nParams: {self.params}'
+
     def __repr__(self):
         '''echoes class, id, & reproducible representation in the REPL'''
-        return '{}, SPMImage({})'.format(super(SPMImage, self).__repr__(), 
-                                  self.data)        
+        return '{}, SPMImage({})'.format(super(SPMImage, self).__repr__(),
+                                         self.data)
