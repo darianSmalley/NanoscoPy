@@ -160,8 +160,29 @@ class STS(Spectrum):
             self._integrate_current()
             self._calculate_ndc()
 
+        self._zero_gap()
+
         if (self.dIdV < 0).any():
-            self._offset_correction()
+            self._offset_correction(shift=False)
+
+    def _calculate_ndc(self):
+        self._integrate_current()
+        ndc = self.dIdV * (self.bias/self.current)
+        self.dataframe[self.ndc_label] = ndc
+        self.ndc = ndc
+
+    def _integrate_current(self):
+        current = integrate.cumulative_trapezoid(self.dIdV, initial=0)
+        # find all the data points which lie in the bandgap
+        gap_points = current[self.dIdV.index[self.dIdV == 0]]
+
+        if len(gap_points) > 0:
+            zero_point = gap_points[0]
+            # re-scale current so the band gap has zero amplitude
+            current = current - zero_point
+
+        self.current = current
+        self.dataframe[self.i_label] = current
 
     def _mean_signal(self, col_idx):
         """
@@ -177,28 +198,11 @@ class STS(Spectrum):
 
         return mean_signal
 
-    def _calculate_ndc(self):
-        self._integrate_current()
-        ndc = self.dIdV * (self.bias/self.current)
-        self.dataframe[self.ndc_label] = ndc
-        self.ndc = ndc
+    def _offset_correction(self, shift=True):
+        self.offset_correction(self.dIdV, shift)
 
-    def _offset_correction(self):
-        # shift values up so the min is set to zero
-        self.dIdV = self.dIdV + abs(self.dIdV.min())
-
-    def _integrate_current(self):
-        current = integrate.cumulative_trapezoid(self.dIdV, initial=0)
-        # find all the data points which lie in the bandgap
-        gap_points = current[self.dIdV.index[self.dIdV == 0]]
-
-        if len(gap_points) > 0:
-            zero_point = gap_points[0]
-            # re-scale current so the band gap has zero amplitude
-            current = current - zero_point
-
-        self.current = current
-        self.dataframe[self.i_label] = current
+    def _zero_gap(self):
+        self.zero_gap(self.current, self.dIdV)
 
     def get_signal(self, signal_label):
         return self.dataframe[signal_label]
@@ -275,10 +279,10 @@ class STS(Spectrum):
         sel_bias.iat[0] = np.round(sel_bias.iat[0], 1)
         sel_bias.iat[-1] = np.round(sel_bias.iat[-1], 1)
 
-        if zero_gap:
-            curr_condition = (sel_current > -1e-12) & (sel_current < 1e-12)
-            # dIdV_condition = (sel_dIdV > -1e-12) & (sel_dIdV < 1e-12)
-            sel_dIdV[curr_condition] = 0
+        sel_dIdV = self.zero_gap(sel_current, sel_dIdV)
+
+        if (sel_dIdV < 0).any():
+            self.offset_correction(sel_dIdV, shift=False)
 
         if norm:
             sel_dIdV = normalize(sel_dIdV)
@@ -335,3 +339,22 @@ class STS(Spectrum):
         self.new_dIdV = new_dIdV
 
         return new_dIdV, new_current, new_ndc
+
+    def offset_correction(self, signal=[], shift=True):
+        if shift:
+            # print('shift offset')
+            # shift values up so the min is set to zero
+            signal = signal + abs(signal.min())
+        else:
+            # print('floor offset')
+            # set negative values in dIdV to zero to ensure
+            # correct normalization
+            signal[signal < 0] = 0.1*np.abs(signal[signal < 0])
+
+        return signal
+
+    def zero_gap(self, current, dIdV):
+        curr_condition = (current > -1e-12) & (current < 1e-12)
+        # dIdV_condition = (sel_dIdV > -1e-12) & (sel_dIdV < 1e-12)
+        dIdV[curr_condition] = 0
+        return dIdV
