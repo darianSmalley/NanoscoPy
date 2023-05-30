@@ -1,8 +1,10 @@
 import os
+from datetime import datetime
 from shutil import copy2
 from tkinter import Tk, filedialog, Label
 
-def pad_filename_with_zeros(filepath, file_index_delim = '_' , pad_digits = 4):
+
+def pad_filename_with_zeros(filepath, file_index_delim='_', pad_digits=4):
     """
     filepath: string. Contains path to file whose name is to be padded
     file_index_delim: string. Contains character which immediately precedes file index number.
@@ -19,10 +21,12 @@ def pad_filename_with_zeros(filepath, file_index_delim = '_' , pad_digits = 4):
     # Generate the new file index, padded to specified number of digits
     new_file_number = '0'*(pad_digits-len(file_number))+file_number
     # Generate new file name, including padded file index.
-    new_filename = filepath[:final_underscore] + '_' + new_file_number + extension
+    new_filename = filepath[:final_underscore] + \
+        '_' + new_file_number + extension
     return new_filename
 
-def rename_with_padding(source_folder_path , destination_folder_path , copy_files = True , file_index_delim = '_' , pad_digits = 4):
+
+def rename_with_padding(source_folder_path, destination_folder_path, copy_files=True, file_index_delim='_', pad_digits=4):
     """
     source_folder_path: string. Contains the directory holding the files with names to be padded.
     destination_folder_path: string. Contains the directory into which the renamed files are to be saved.
@@ -33,29 +37,36 @@ def rename_with_padding(source_folder_path , destination_folder_path , copy_file
     # Iterate through the entire directory.
     for file in os.listdir(source_folder_path):
         # Generate new filename with index padding.
-        new_filename = pad_filename_with_zeros(file , file_index_delim = file_index_delim , pad_digits = pad_digits)
+        new_filename = pad_filename_with_zeros(
+            file, file_index_delim=file_index_delim, pad_digits=pad_digits)
         if copy_files == True:
             # Copy and rename files with padding if copy_files is set to true.
-            copy2( os.path.join(source_folder_path, file) , os.path.join(destination_folder_path , new_filename ))
+            copy2(os.path.join(source_folder_path, file),
+                  os.path.join(destination_folder_path, new_filename))
         else:
             # Rename files in place with padding if copy_files is not set to True
-            os.rename( os.path.join(source_folder_path, file) , os.path.join(destination_folder_path , new_filename ))
+            os.rename(os.path.join(source_folder_path, file),
+                      os.path.join(destination_folder_path, new_filename))
+
 
 def sort_data_ascending(data, indep_variable_name):
     """
     Checks whether the input data is sorted in ascending order.
-    
+
     Inputs:
         data: DataFrame. Contains the data to be sorted.
         indep_variable_name: string. Specifies the column name in data which is the independent variable to be used for sorting.
-    
+
     Outputs:
         data: DataFrame. Contains the data, sorted in ascending order.
     """
     if data[indep_variable_name][1] < data[indep_variable_name][0]:
-        data = data.reindex(index = data.index[::-1]) # Reverse the order of the elements (put it in ascending order)
-        data.reset_index(inplace = True, drop = True) # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
+        # Reverse the order of the elements (put it in ascending order)
+        data = data.reindex(index=data.index[::-1])
+        # Reset the indexing of the dataframe to allow for normal slicing with the reversed order
+        data.reset_index(inplace=True, drop=True)
     return data
+
 
 def dialog_askdirectory():
     """
@@ -70,6 +81,7 @@ def dialog_askdirectory():
     root.destroy()
     return folder_path
 
+
 def dialog_askfilename():
     """
     Prompts the user to select a file and returns the path for that file.
@@ -79,15 +91,30 @@ def dialog_askfilename():
     """
     root = Tk()
     Label(root, text="Select data folder")
-    file_path = filedialog.askopenfilename() 
+    file_path = filedialog.askopenfilename()
     root.destroy()
-    return  file_path
+    return file_path
+
 
 def progbar(curr, total, full_progbar, display):
     frac = curr/total
     filled_progbar = round(frac*full_progbar)
-    print('\r', 
+    print('\r',
           f'{display}',
-          '#'*filled_progbar + '-'*(full_progbar-filled_progbar), 
-          f'[{frac:>7.2%}]', 
+          '#'*filled_progbar + '-'*(full_progbar-filled_progbar),
+          f'[{frac:>7.2%}]',
           end='')
+
+
+def try_parsing_date(possible_date):
+    """
+    Try to parse a date using several formats, warn about
+    problematic value if the possible_date does not match
+    any of the formats tried
+    """
+    for fmt in ('%Y-%m-%d', '%d.%m.%Y', '%d/%m/%Y', '%y%m%d', '%d.%m.%Y %H:%M:%S'):
+        try:
+            return datetime.strptime(possible_date, fmt)
+        except ValueError:
+            pass
+    raise ValueError(f"Non-valid date format for field: '{possible_date}'")

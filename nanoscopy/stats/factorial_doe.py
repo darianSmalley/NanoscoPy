@@ -61,15 +61,23 @@ def calc_interaction_effect(data, factor1, factor2, response):
 
     means = {}
     for level2 in [high2, low2]:
+        # get response when factor2 is at level high/low
         factor2_level_mask = data[factor2] == level2
         factor2_level_responses = data[factor2_level_mask][response]
 
+        # get factor1 value when factor2 is at level high/low
         factor2_level_factor1 = data[factor2_level_mask][factor1]
+
+        # get the right sign combination for each level of factor1
         conditions = [(factor2_level_factor1 == high1),(factor2_level_factor1 == low1)]
         choices = [1, -1]
         factor_signs = np.select(conditions, choices)
+
+        # adjust sign of reponses when factor 2 is at level by the level of factor 1
         factor2_responses_factor1_signs = factor2_level_responses * factor_signs
+
         factor1_factor2_responses_mean = factor2_responses_factor1_signs.mean()
+
         means[level2] = factor1_factor2_responses_mean
 
     return means[high2] - means[low2]    
