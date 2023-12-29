@@ -6,12 +6,12 @@ import pandas as pd
 from .spectrum import Spectrum, STS
 from ..utilities import progbar
 
-sts_ext = tuple(['.dat', '.3ds'])
+sts_ext = tuple([".dat", ".3ds"])
 FILES_NOT_FOUND_ERROR = "No files found."
 FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat and 3ds are supported."
 
 
-def determine_metadata_lines(path, source='Nanonis'):
+def determine_metadata_lines(path, source="Nanonis"):
     """
     Searches the beginning lines of a file containing tabular data to determine the number of lines at the beginning of the file contain metadata.
 
@@ -22,14 +22,14 @@ def determine_metadata_lines(path, source='Nanonis'):
     Outputs:
         metadata_end: int. Specifies the row index corresponding to the end of the metadata at the beginnong of the data file.
     """
-    if source in ['Nanonis', 'Ishigami']:
+    if source in ["Nanonis", "Ishigami"]:
         # Determine if the path was specified as a list of path snipets
         if isinstance(path, list):
             # Use list unpacking to separate elements into multiple arguments, then join them into a proper path.
             filepath = os.path.join(*path)
 
         # Load only the first column of data.
-        data_column = pd.read_csv(path, sep='\t', usecols=[0], header=None)
+        data_column = pd.read_csv(path, sep="\t", usecols=[0], header=None)
 
         # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
         metadata_end = data_column[data_column[0] == "[DATA]"].index[0]
@@ -37,17 +37,23 @@ def determine_metadata_lines(path, source='Nanonis'):
     return metadata_end
 
 
-def get_metadata(path, metadata_end, source='Nanonis'):
-    if (source == 'Ishigami') or (source == 'Nanonis'):
-        metadata = pd.read_csv(path, sep='\t', usecols=[0, 1], names=[
-                               'Property', 'Value'], skiprows=1, nrows=metadata_end - 1)
+def get_metadata(path, metadata_end, source="Nanonis"):
+    if (source == "Ishigami") or (source == "Nanonis"):
+        metadata = pd.read_csv(
+            path,
+            sep="\t",
+            usecols=[0, 1],
+            names=["Property", "Value"],
+            skiprows=1,
+            nrows=metadata_end - 1,
+        )
     return metadata
 
 
-def read_STS(path, source='Nanonis', sep='\t'):
+def read_STS(path, source="Nanonis", sep="\t"):
     # Load data into a dataframe
 
-    if source == 'Nanonis':
+    if source == "Nanonis":
         # Determine the number of header rows in the file.
         metadata_end = determine_metadata_lines(path, source=source)
         metadata = get_metadata(path, metadata_end, source=source)
@@ -57,19 +63,19 @@ def read_STS(path, source='Nanonis', sep='\t'):
 
     else:
         metadata = None
-        data = pd.read_csv(path, sep=sep, engine='python')
+        data = pd.read_csv(path, sep=sep, engine="python")
 
     # Drop any columns that contain all NaN values
-    data = data.dropna(axis=1, how='all')
+    data = data.dropna(axis=1, how="all")
     # Drop any rows that contain any NaN values
-    data = data.dropna(axis=0, how='any')
+    data = data.dropna(axis=0, how="any")
 
     spectrum = STS(data, metadata, filepath=path)
 
     return spectrum
 
 
-def read_raman(path, source='RenishawRaman'):
+def read_raman(path, source="RenishawRaman"):
     """
     Imports tabular data from a text file.
 
@@ -81,23 +87,23 @@ def read_raman(path, source='RenishawRaman'):
         data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
     """
     # Load data into a dataframe
-    data = pd.read_csv(path, sep='\t', engine='python')
+    data = pd.read_csv(path, sep="\t", engine="python")
 
-    if source == 'RenishawRaman':
+    if source == "RenishawRaman":
         # Make column labels more descriptive
         # Assign better names than defaults
-        data.columns = ['Raman Shift', 'Intensity']
+        data.columns = ["Raman Shift", "Intensity"]
 
         # Sort the data so that Raman Shift values are in ascending order.
-        data = data.sort_values(by=['Raman Shift'])
+        data = data.sort_values(by=["Raman Shift"])
 
-    elif source == 'RenishawPL':
+    elif source == "RenishawPL":
         # Make column labels more descriptive
         # Assign better names than defaults
-        data.columns = ['Photon Energy', 'Intensity']
+        data.columns = ["Photon Energy", "Intensity"]
 
         # Sort the data so that Photon Energy values are in ascending order.
-        data = data.sort_values(by=['Photon Energy'])
+        data = data.sort_values(by=["Photon Energy"])
 
     spectrum = Spectrum(data)
 
@@ -105,10 +111,10 @@ def read_raman(path, source='RenishawRaman'):
 
 
 def read_numpy(path):
-    np.load('/tmp/123.npy')
+    np.load("/tmp/123.npy")
 
 
-def read_spectrum(path, source='Nanonis', sep='\t'):
+def read_spectrum(path, source="Nanonis", sep="\t"):
     """
     Imports tabular data from a text file.
 
@@ -119,10 +125,10 @@ def read_spectrum(path, source='Nanonis', sep='\t'):
     Outputs:
         data: DataFrame. Contains the imported data. Most of the signals also ensure that the data is sorted such that the independent variable is is ascending order.
     """
-    if source == 'Nanonis':
+    if source == "Nanonis":
         spectrum = read_STS(path, source)
 
-    elif source in ['RenishawRaman', 'RenishawPL']:
+    elif source in ["RenishawRaman", "RenishawPL"]:
         spectrum = read_raman(path, source)
     else:
         # data = pd.read_csv(path, sep=sep, engine='python')
@@ -131,7 +137,7 @@ def read_spectrum(path, source='Nanonis', sep='\t'):
     return spectrum
 
 
-def read_spectra(paths, source='Nanonis'):
+def read_spectra(paths, source="Nanonis"):
     """
     Imports tabular data from a text file.
 
@@ -156,13 +162,17 @@ def read_spectra(paths, source='Nanonis'):
 
     spectra = []
     for i, path in enumerate(paths):
-        progbar(i+1, len(paths), 10, 'Reading spectra...Done' if i +
-                1 == len(paths) else 'Reading spectra...')
+        progbar(
+            i + 1,
+            len(paths),
+            10,
+            "Reading spectra...Done" if i + 1 == len(paths) else "Reading spectra...",
+        )
 
         if path.endswith(".dat"):
             spectrum = read_spectrum(path, source)
         elif path.endswith(".csv"):
-            spectrum = read_spectrum(path, source=None, sep=',')
+            spectrum = read_spectrum(path, source=None, sep=",")
         elif path.endswith(".npy"):
             spectrum = np.load(path)
         else:
@@ -173,7 +183,7 @@ def read_spectra(paths, source='Nanonis'):
     return spectra
 
 
-def read(path, filter='', signal=None):
+def read(path, filter="", source=None):
     """
     Imports tabular data from a text file.
 
@@ -200,6 +210,6 @@ def read(path, filter='', signal=None):
         raise ValueError(FILES_NOT_FOUND_ERROR)
 
     # Read files with appropriate import function
-    spectra = read_spectra(paths, signal)
+    spectra = read_spectra(paths, source)
 
     return spectra

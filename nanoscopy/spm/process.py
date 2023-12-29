@@ -3,19 +3,22 @@ import spiepy
 from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
+import pySPM
 from ..utilities import progbar
 
 
-def rescale(image):
-    ''' Rescale images to 0-255 as type unit8 for use with open CV '''
-    return ((image - image.min()) * (1/(image.max() - image.min()) * 255)).astype('uint8')
+def rescale_image(image):
+    """Rescale images to 0-255 as type unit8 for use with open CV"""
+    return (image - image.min()) * (1 / (image.max() - image.min()) * 255)
 
 
 def CLAHE(image):
-    ''' Contrast Limited Adaptive Histogram Equalization '''
+    """Contrast Limited Adaptive Histogram Equalization"""
     # create a CLAHE object (Arguments are optional).
+    image = image.astype("uint8")
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    return clahe.apply(image)
+    eq = clahe.apply(image)
+    return eq
 
 
 def line_flatten(image):
@@ -29,23 +32,13 @@ def line_flatten(image):
 
 
 def basic_flatten(image, poly=True):
-    ''' 2nd order polynomial plane fitting, then line-by-line average offset '''
+    """2nd order polynomial plane fitting, then line-by-line average offset"""
     im = spiepy.Im()
     im.data = image
     im, _ = spiepy.flatten_xy(im)
     if poly:
         im, _ = spiepy.flatten_poly_xy(im, deg=2)
     im = line_flatten(im.data)
-    return im
-
-
-def basic_correction(image, poly, equalize=True):
-    ''' basic flatten, then rescale to [0,255] as uint8, then equalize, finaly smooth.'''
-    im = basic_flatten(image, poly)
-    im = rescale(im)
-    if equalize:
-        im = CLAHE(im)
-    im = cv2.GaussianBlur(im, (3, 3), cv2.BORDER_DEFAULT)
     return im
 
 
@@ -56,7 +49,7 @@ def flatten(images):
         try:
             flattened = basic_flatten(image)
             output.append(flattened)
-            progbar(i+1, n, 10, 'Corrcting images...')
+            progbar(i + 1, n, 10, "Corrcting images...")
 
         except Exception as error:
             print(error)
@@ -65,29 +58,74 @@ def flatten(images):
     return output
 
 
-def correct(images, terrace=False, poly=True, equalize=True):
+def correct_image(
+    image,
+    terrace=False,
+    poly=True,
+    equalize=True,
+    blur=True,
+    rescale=True,
+    scar=False,
+):
+    im = spiepy.Im()
+    im.data = image
+
+    im, _ = spiepy.flatten_xy(im)
+
+    if poly:
+        im, _ = spiepy.flatten_poly_xy(im, deg=2)
+
+    if terrace:
+        im = terrace_level(im.data)
+    else:
+        im = line_flatten(im.data)
+
+    if scar:
+        im = scar_removal(im)
+
+    if rescale:
+        im = rescale_image(im)
+
+    if blur:
+        im = cv2.GaussianBlur(im, (3, 3), cv2.BORDER_DEFAULT)
+
+    if equalize:
+        im = CLAHE(im)
+
+    return im
+
+
+def correct(images, terrace=False, poly=True, equalize=True, rescale=True, scar=False):
     output = []
     n = len(images)
     for i, image in enumerate(images):
         try:
-            corrected = basic_correction(image, poly, equalize)
+            im = correct_image(
+                image,
+                terrace=terrace,
+                poly=poly,
+                equalize=equalize,
+                rescale=rescale,
+                scar=scar,
+            )
+            output.append(im)
 
-            if terrace:
-                corrected = terrace_level(corrected)
-
-            output.append(corrected)
-            progbar(i+1, n, 10, 'Corrcting images...Done' if i +
-                    1 == n else 'Corrcting images...')
+            # progbar(
+            #     i + 1,
+            #     n,
+            #     10,
+            #     "Corrcting images...Done" if i + 1 == n else "Corrcting images...",
+            # )
 
         except Exception as error:
-            print(error)
+            print("Error:", error)
             output.append(image)
 
-    print('')
+    # print("")
     return output
 
 
-def subtract_poly1D(image, poly_order=2, mask=None, axis='x'):
+def subtract_poly1D(image, poly_order=2, mask=None, axis="x"):
     """
     Performs polynomial background subtraction on a whole image along one axis. The whole image is fitted with a single polynomial.
 
@@ -102,7 +140,7 @@ def subtract_poly1D(image, poly_order=2, mask=None, axis='x'):
         background_image: numpy array. The image of the polynomial background which was subtracted from the inputted image.
     """
     # Transpose image if y direction is selected for leveling. This puts the y axis of the original image along the x axis during processing.
-    if axis in ['y', 'Y']:
+    if axis in ["y", "Y"]:
         image = image.transpose()
 
     # Initialize array for background image
@@ -134,14 +172,14 @@ def subtract_poly1D(image, poly_order=2, mask=None, axis='x'):
     image_subtracted = image - background_image
 
     # Transpose images back to original orientation if y axis is selected for leveling. This is unecessary if x is selected.
-    if axis in ['y', 'Y']:
+    if axis in ["y", "Y"]:
         image_subtracted = image_subtracted.transpose()
         background_image = background_image.transpose()
 
     return image_subtracted, background_image
 
 
-def subtract_poly1D_line(image, poly_order=2, mask=None, axis='x'):
+def subtract_poly1D_line(image, poly_order=2, mask=None, axis="x"):
     """
     Performs polynomial background subtraction of an image in a line-by-line fashion. Each line is fitted and background-subtracted separately.
 
@@ -156,7 +194,7 @@ def subtract_poly1D_line(image, poly_order=2, mask=None, axis='x'):
         background_image: numpy array. The image of the polynomial background which was subtracted from the inputted image.
     """
     # Transpose image if y direction is selected for leveling. This puts the y axis of the original image along the x axis during processing.
-    if axis in ['y', 'Y']:
+    if axis in ["y", "Y"]:
         image = image.transpose()
 
     # Initialize array for background image
@@ -178,23 +216,25 @@ def subtract_poly1D_line(image, poly_order=2, mask=None, axis='x'):
     for row_num, [X_row, Z_row] in enumerate(zip(X_image, Z_image)):
         # Fit a polynomial to the unmasked data from each row of the image individually
         coeffs = np.polynomial.polynomial.polyfit(
-            X_row.compressed(), Z_row.compressed(), poly_order)
+            X_row.compressed(), Z_row.compressed(), poly_order
+        )
         # Calculate polynomial background for all pixels of the image
         background_image[row_num] = np.polynomial.polynomial.polyval(
-            X_grid[row_num], coeffs)
+            X_grid[row_num], coeffs
+        )
 
     # Subtract polynomial background from image
     image_subtracted = image - background_image
 
     # Transpose images back to original orientation if y axis is selected for leveling. This is unecessary if x is selected.
-    if axis in ['y', 'Y']:
+    if axis in ["y", "Y"]:
         image_subtracted = image_subtracted.transpose()
         background_image = background_image.transpose()
 
     return image_subtracted, background_image
 
 
-def create_mask(image, mask_method='mask_by_mean'):
+def create_mask(image, mask_method="mask_by_mean"):
     """
     Creates a mask to exclude certain parts of an image. This can be useful for excluding troublesome sections of an image during flattening.
 
@@ -209,17 +249,17 @@ def create_mask(image, mask_method='mask_by_mean'):
     im.data = image
 
     # Create an image mask using one of SPIEPy's built-in methods.
-    if mask_method == 'mean':
+    if mask_method == "mean":
         # Use this if this if there is contamination, but no atomic resolution
         mask = spiepy.mask_by_mean(im)
-    elif mask_method == 'peak-trough':
+    elif mask_method == "peak-trough":
         # Use this if there is a fair amount of contamination in the imge, but also atomic resolution
         mask, _ = spiepy.mask_by_troughs_and_peaks(im)
-    elif mask_method == 'step':
+    elif mask_method == "step":
         # Use this if there are step edges in the image
         mask = spiepy.locate_steps(im, 4)
     else:
-        print('Unknown masking type.')
+        print("Unknown masking type.")
         mask = np.zeros_like(image)
     return mask
 
@@ -235,14 +275,16 @@ def plot_masked_image(image, mask):
     # Make a masked array, to visualize the mask superimposed over the image
     masked_image = np.ma.array(image, mask=mask)
     palette = spiepy.NANOMAP
-    palette.set_bad('#00ff00', 1.0)
+    palette.set_bad("#00ff00", 1.0)
     # Show the masked image
-    plt.imshow(masked_image, cmap=spiepy.NANOMAP, origin='lower')
+    plt.imshow(masked_image, cmap=spiepy.NANOMAP, origin="lower")
 
 
-def plot_mask_comparison(im_unleveled, mask, im_leveled, titles=['Masked Image', 'Leveled Image']):
+def plot_mask_comparison(
+    im_unleveled, mask, im_leveled, titles=["Masked Image", "Leveled Image"]
+):
     """
-    Creates a figure showing both the original image and a masked version of the image. 
+    Creates a figure showing both the original image and a masked version of the image.
 
     Inputs:
         im_unleveled: Numpy array. Contains the image to be masked.
@@ -257,16 +299,16 @@ def plot_mask_comparison(im_unleveled, mask, im_leveled, titles=['Masked Image',
     # Generate masked image of unleveled image
     masked_image = np.ma.array(im_unleveled.data, mask=mask)
     palette = spiepy.NANOMAP
-    palette.set_bad('#00ff00', 1.0)
+    palette.set_bad("#00ff00", 1.0)
 
     # Generate a subplot figure for plotting.
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
     # Plot the masked image on the subplot figure
-    ax1.imshow(masked_image, cmap=spiepy.NANOMAP, origin='lower')
+    ax1.imshow(masked_image, cmap=spiepy.NANOMAP, origin="lower")
     ax1.set_title(titles[0])
     # Plot the leveled image on the subplot figure
-    ax2.imshow(im_leveled.data, cmap=spiepy.NANOMAP, origin='lower')
+    ax2.imshow(im_leveled.data, cmap=spiepy.NANOMAP, origin="lower")
     ax2.set_title(titles[1])
 
     return fig, (ax1, ax2)
@@ -287,13 +329,37 @@ def terrace_level(image):
     im.data = image
 
     # Pre-flatten the image using a plane fit to remove large-scale tilt in the image.
-    im_preflat, _ = spiepy.flatten_xy(im)
+    # im_preflat, _ = spiepy.flatten_xy(im)
 
     # Locate the step
-    mask_step = create_mask(im_preflat.data, mask_method='step')
+    mask_step = create_mask(im.data, mask_method="step")
+    # mask = spiepy.locate_steps(regions, 5)
 
     # Flatten the image, taking the step into account
     im_leveled_step, _ = spiepy.flatten_xy(im, mask_step)
 
     # Return the flattened image as a Numpy Array.
     return im_leveled_step.data
+
+
+def scar_removal(image):
+    """
+    Attempts to level an image by finding terraces in the image and calculating the needed transform to make the terraces level on the average.
+
+    Inputs:
+        image: Numpy array. Contains the image to be masked.
+
+    Outputs:
+        Numpy array. Levelled image.
+    """
+
+    topo = pySPM.SPM_image(image)
+    topo = topo.filter_scars_removal(0.7, inline=False)
+    return topo.pixels
+
+
+def loc_regions(image):
+    im = spiepy.Im()
+    im.data = image
+    regions, peaks = spiepy.locate_regions(image)
+    return regions, peaks

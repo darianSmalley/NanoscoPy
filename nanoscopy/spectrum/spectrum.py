@@ -13,7 +13,7 @@ def mirrored_range_with_zero(maxval, inc):
 
 
 def range_with_zero(minval, maxval, inc):
-    x_pos = np.arange(inc, maxval+inc, inc)
+    x_pos = np.arange(inc, maxval + inc, inc)
     x_neg = np.arange(minval, 0, inc)
 
     # if x_pos[-1] != maxval:
@@ -27,7 +27,7 @@ def new_range(min=-3, max=3, step=0.0025, zero_centered=True):
     if zero_centered:
         new_bias = range_with_zero(min, max, step)
     else:
-        n_points = int((max - min)/step)
+        n_points = int((max - min) / step)
         new_bias = np.linspace(min, max, n_points)
 
     return new_bias
@@ -41,7 +41,7 @@ def squared_error(array):
 
     # calculate squared errors
     # squared_error = [(row-mean)**2 for row, mean in zip(array, means)]
-    squared_error = [(value-mean)**2 for value in array] / mean
+    squared_error = [(value - mean) ** 2 for value in array] / mean
     # print(squared_error)
     return squared_error
 
@@ -117,7 +117,7 @@ def interpolate_STS_dfs(df_list, bias_label, lix_label, bias_new):
 
 
 class Spectrum(object):
-    def __init__(self, dataframe=None, metadata=None, filepath=''):
+    def __init__(self, dataframe=None, metadata=None, filepath=""):
         self.dataframe = dataframe
         self.metadata = metadata
         self.filepath = filepath
@@ -132,10 +132,10 @@ class STS(Spectrum):
         super().__init__(*args, **kw)
 
         # initialize default values
-        self.b_label = 'Bias (V)'
-        self.i_label = 'Current (A)'
-        self.dIdV_label = 'dIdV'
-        self.ndc_label = 'NDC'
+        self.b_label = "Bias (V)"
+        self.i_label = "Current (A)"
+        self.dIdV_label = "dIdV"
+        self.ndc_label = "NDC"
 
         self.current = None
         self.dIdV = None
@@ -145,29 +145,33 @@ class STS(Spectrum):
         self.label = None
 
         # bias is assumed to be the first data column
-        self.dataframe = self.dataframe.rename(
-            columns={self.dataframe.columns[0]: self.b_label})
+        # self.dataframe = self.dataframe.rename(
+        #     columns={
+        #         self.dataframe.columns[0]: self.b_label,
+        #         self.dataframe.columns[1]: self.i_label,
+        #         self.dataframe.columns[2]: self.dIdV_label
+        #     })
         self.bias = self.dataframe.iloc[:, 0]
         # get size of matrix after skipping the bias column
         self.n, self.m = self.dataframe.iloc[:, 1::].shape
 
-        if self.m > 1:
-            self.set_mean_signals()
-        else:
-            self.dataframe = self.dataframe.rename(
-                columns={self.dataframe.columns[1]: self.dIdV_label})
-            self.dIdV = self.dataframe.iloc[:, 1]
-            self._integrate_current()
-            self._calculate_ndc()
+        # if self.m > 1:
+        #     self.set_mean_signals()
+        # else:
+        #     self.dataframe = self.dataframe.rename(
+        #         columns={self.dataframe.columns[1]: self.dIdV_label})
+        #     self.dIdV = self.dataframe.iloc[:, 1]
+        #     self._integrate_current()
+        #     self._calculate_ndc()
 
-        self._zero_gap()
+        # self._zero_gap()
 
-        if (self.dIdV < 0).any():
-            self._offset_correction(shift=False)
+        # if (self.dIdV < 0).any():
+        #     self._offset_correction(shift=False)
 
     def _calculate_ndc(self):
         self._integrate_current()
-        ndc = self.dIdV * (self.bias/self.current)
+        ndc = self.dIdV * (self.bias / self.current)
         self.dataframe[self.ndc_label] = ndc
         self.ndc = ndc
 
@@ -193,8 +197,9 @@ class STS(Spectrum):
         # select all current columns (avg, fwd, bwd)
         # then average all columns together
         # m is divided by 2 since half of the columns are current
-        mean_signal = self.dataframe.iloc[:, col_idx::2].cumsum(
-            axis=1).iloc[:, -1] / (self.m / 2)
+        mean_signal = self.dataframe.iloc[:, col_idx::2].cumsum(axis=1).iloc[:, -1] / (
+            self.m / 2
+        )
 
         return mean_signal
 
@@ -217,13 +222,18 @@ class STS(Spectrum):
         bias = self.bias
         current = self._mean_signal(1)
         dIdV = self._mean_signal(2)
-        ndc = dIdV * (bias/current)
+        ndc = dIdV * (bias / current)
 
-        mean_df = pd.concat([bias.rename(self.b_label),
-                            current.rename(self.i_label),
-                            dIdV.rename(self.dIdV_label),
-                            ndc.rename(self.ndc_label),
-                            pd.DataFrame([self.filepath], columns=['filepath'])], axis=1)
+        mean_df = pd.concat(
+            [
+                bias.rename(self.b_label),
+                current.rename(self.i_label),
+                dIdV.rename(self.dIdV_label),
+                ndc.rename(self.ndc_label),
+                pd.DataFrame([self.filepath], columns=["filepath"]),
+            ],
+            axis=1,
+        )
 
         self.dataframe = mean_df
         self.current = current
@@ -242,11 +252,14 @@ class STS(Spectrum):
 
         fill_value = 0
         f = interpolate.interp1d(
-            self.bias, dIdV, bounds_error=False, fill_value=fill_value)
+            self.bias, dIdV, bounds_error=False, fill_value=fill_value
+        )
         g = interpolate.interp1d(
-            self.bias, current, bounds_error=False, fill_value=fill_value)
+            self.bias, current, bounds_error=False, fill_value=fill_value
+        )
         h = interpolate.interp1d(
-            self.bias, ndc, bounds_error=False, fill_value=fill_value)
+            self.bias, ndc, bounds_error=False, fill_value=fill_value
+        )
 
         # new_bias = new_range(self.bias.min(), self.bias.max(), step, zero_centered=False)
         new_bias = np.linspace(self.bias.min(), self.bias.max(), n)
@@ -273,13 +286,15 @@ class STS(Spectrum):
         sel_current = self.dataframe[mask][self.i_label].reset_index(drop=True)
         sel_dIdV = self.dataframe[mask][self.dIdV_label].reset_index(drop=True)
         sel_bias = np.round(
-            self.dataframe[mask][self.b_label].reset_index(drop=True), 2)
+            self.dataframe[mask][self.b_label].reset_index(drop=True), 2
+        )
 
         # round endpoints to ensure selected range matched target end points
         sel_bias.iat[0] = np.round(sel_bias.iat[0], 1)
         sel_bias.iat[-1] = np.round(sel_bias.iat[-1], 1)
 
-        sel_dIdV = self.zero_gap(sel_current, sel_dIdV)
+        if zero_gap:
+            sel_dIdV = self.zero_gap(sel_current, sel_dIdV)
 
         if (sel_dIdV < 0).any():
             self.offset_correction(sel_dIdV, shift=False)
@@ -287,21 +302,23 @@ class STS(Spectrum):
         if norm:
             sel_dIdV = normalize(sel_dIdV)
 
-        fill_value = 'extrapolate' if extrapolate else 0
+        fill_value = "extrapolate" if extrapolate else 0
 
         try:
             # f = interpolate.interp1d(sel_bias, sel_dIdV, bounds_error=False, fill_value=fill_value)
             f = interpolate.interp1d(sel_bias, sel_dIdV)
+            g = interpolate.interp1d(sel_bias, sel_current)
             new_dIdV = f(new_bias)
+            new_current = g(new_bias)
             self.new_bias = new_bias
             self.new_dIdV = new_dIdV
-            return new_dIdV
+            return new_dIdV, new_current
 
         except ValueError as e:
             print(self.filepath[-17:])
-            print('raw bias:', bias.min(), bias.max())
-            print('new bias:', new_bias.min(), new_bias.max())
-            print('selected bias:', sel_bias.min(), sel_bias.max())
+            print("raw bias:", bias.min(), bias.max())
+            print("new bias:", new_bias.min(), new_bias.max())
+            print("selected bias:", sel_bias.min(), sel_bias.max())
             raise e
 
     def preprocess_new_bias(self, new_bias, norm=True, extrapolate=False):
@@ -323,13 +340,14 @@ class STS(Spectrum):
             current = normalize(current)
             ndc = normalize(ndc)
 
-        fill_value = 'extrapolate' if extrapolate else 0
-        f = interpolate.interp1d(
-            bias, dIdV, bounds_error=False, fill_value=fill_value)
+        fill_value = "extrapolate" if extrapolate else 0
+        f = interpolate.interp1d(bias, dIdV, bounds_error=False, fill_value=fill_value)
         g = interpolate.interp1d(
-            bias, current, bounds_error=False, fill_value=fill_value)
+            bias, current, bounds_error=False, fill_value=fill_value
+        )
         h = interpolate.interp1d(
-            bias, current, bounds_error=False, fill_value=fill_value)
+            bias, current, bounds_error=False, fill_value=fill_value
+        )
 
         new_dIdV = f(new_bias)
         new_current = g(new_bias)
@@ -349,7 +367,7 @@ class STS(Spectrum):
             # print('floor offset')
             # set negative values in dIdV to zero to ensure
             # correct normalization
-            signal[signal < 0] = 0.1*np.abs(signal[signal < 0])
+            signal[signal < 0] = 0.1 * np.abs(signal[signal < 0])
 
         return signal
 
