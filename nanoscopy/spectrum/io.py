@@ -1,5 +1,6 @@
 import os
 import glob
+from typing import List, Tuple
 import numpy as np
 import pandas as pd
 
@@ -11,52 +12,67 @@ FILES_NOT_FOUND_ERROR = "No files found."
 FILETYPE_ERROR = "SUPPORTED FILETYPE NOT FOUND. Only dat and 3ds are supported."
 
 
-def determine_metadata_lines(path, source="Nanonis"):
+def determine_metadata_lines(path: str) -> int:
     """
     Searches the beginning lines of a file containing tabular data to determine the number of lines at the beginning of the file contain metadata.
 
-    Inputs:
-        path: string. Specifies the full file path of the file to be examined. Should include the file extension.
-        source: string. Specifies a family of instrument which generated the file to be examined. This determines how the algorithm locates the end of the metadata.
+    Args:
+        path (str): Specifies the full file path of the file to be examined. Should include the file extension.
 
-    Outputs:
-        metadata_end: int. Specifies the row index corresponding to the end of the metadata at the beginnong of the data file.
+    Returns:
+        metadata_end (int): Specifies the row index corresponding to the end of the metadata at the beginnong of the data file.
     """
-    if source in ["Nanonis", "Ishigami"]:
-        # Determine if the path was specified as a list of path snipets
-        if isinstance(path, list):
-            # Use list unpacking to separate elements into multiple arguments, then join them into a proper path.
-            filepath = os.path.join(*path)
 
-        # Load only the first column of data.
-        data_column = pd.read_csv(path, sep="\t", usecols=[0], header=None)
+    # Load only the first column of data.
+    data_column = pd.read_csv(path, sep="\t", usecols=[0], header=None)
 
-        # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
-        metadata_end = data_column[data_column[0] == "[DATA]"].index[0]
+    # Find the first match for '[DATA]' in the file. This should always be one row before the beginning of the data.
+    metadata_end = data_column[data_column[0] == "[DATA]"].index[0]
 
     return metadata_end
 
 
-def get_metadata(path, metadata_end, source="Nanonis"):
-    if (source == "Ishigami") or (source == "Nanonis"):
-        metadata = pd.read_csv(
-            path,
-            sep="\t",
-            usecols=[0, 1],
-            names=["Property", "Value"],
-            skiprows=1,
-            nrows=metadata_end - 1,
-        )
+def get_metadata(path, metadata_end) -> pd.DataFrame:
+    """
+    Searches the beginning lines of a file containing tabular data to determine the number of lines at the beginning of the file contain metadata.
+
+    Args:
+        path (str): Specifies the full file path of the file to be examined. Should include the file extension.
+
+    Returns:
+        metadata (pd.DataFrame): panadas DataFrame containing all metadata found in the STS file header.
+    """
+    metadata = pd.read_csv(
+        path,
+        sep="\t",
+        usecols=[0, 1],
+        names=["Property", "Value"],
+        skiprows=1,
+        nrows=metadata_end - 1,
+    )
+    metadata = metadata.set_index("Property")
     return metadata
 
 
-def read_STS(path, source="Nanonis", sep="\t"):
+def read_STS(path: str, source: str = "Nanonis", sep: str = "\t") -> STS:
+    """
+    Reads tabular STS data from a text file.
+
+    Args:
+        path (str): Path string of the file to be read.
+        sep (str): String dilimiter used during reading
+
+    Returns:
+        spectrum (STS): Class contains the imported data.
+    """
     # Load data into a dataframe
 
     if source == "Nanonis":
         # Determine the number of header rows in the file.
-        metadata_end = determine_metadata_lines(path, source=source)
-        metadata = get_metadata(path, metadata_end, source=source)
+        metadata_end = determine_metadata_lines(path)
+
+        # Get metadata as a pandas DataFrame
+        metadata = get_metadata(path, metadata_end)
 
         # Load only the data portion (with column names), skipping the header.
         data = pd.read_csv(path, sep=sep, header=1, skiprows=metadata_end)
@@ -67,6 +83,7 @@ def read_STS(path, source="Nanonis", sep="\t"):
 
     # Drop any columns that contain all NaN values
     data = data.dropna(axis=1, how="all")
+
     # Drop any rows that contain any NaN values
     data = data.dropna(axis=0, how="any")
 
@@ -111,10 +128,14 @@ def read_raman(path, source="RenishawRaman"):
 
 
 def read_numpy(path):
-    np.load("/tmp/123.npy")
+    data = np.load(path)
+    data[[0, 1]] = data[[1, 0]]
+    data_df = pd.DataFrame(data.T)
+    spectrum = STS(data_df)
+    return spectrum
 
 
-def read_spectrum(path, source="Nanonis", sep="\t"):
+def read_spectrum(path, source="Nanonis", sep="\t") -> STS:
     """
     Imports tabular data from a text file.
 
@@ -137,28 +158,16 @@ def read_spectrum(path, source="Nanonis", sep="\t"):
     return spectrum
 
 
-def read_spectra(paths, source="Nanonis"):
+def read_spectra(paths: List[str], source: str) -> List[STS]:
     """
     Imports tabular data from a text file.
 
-    Inputs:
+    Args:
         path: string. Specifies the full file path (including file extension) of the file to be imported.
-        src_format: string. Specifies which (if any) specialized importing routines should be used to prepare the data (e.g. to skip metadata at the beginning of a file)
 
-    Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    Returns:
+        data (List[STS]): Contains the imported data as STS objects.
     """
-    # if paths[0].endswith(".dat"):
-    #     spectra = list(map(lambda p: read_spectrum(p, source), paths))
-    #     spectra = [read_spectrum(path, source) for path in paths]
-    # elif paths[0].endswith(".csv"):
-    #     spectra = [read_spectrum(path, source=None, sep=',') for path in paths]
-    # elif paths[0].endswith(".npy"):
-    #     spectra = [np.load(path) for path in paths]
-    # else:
-    #     raise ValueError(FILETYPE_ERROR)
-
-    # return spectra
 
     spectra = []
     for i, path in enumerate(paths):
@@ -174,7 +183,7 @@ def read_spectra(paths, source="Nanonis"):
         elif path.endswith(".csv"):
             spectrum = read_spectrum(path, source=None, sep=",")
         elif path.endswith(".npy"):
-            spectrum = np.load(path)
+            spectrum = read_numpy(path)
         else:
             raise ValueError(FILETYPE_ERROR)
 
@@ -183,21 +192,19 @@ def read_spectra(paths, source="Nanonis"):
     return spectra
 
 
-def read(path, filter="", source=None):
+def read(path: str, filter: str = "", source: str = "Nanonis") -> List[STS]:
     """
     Imports tabular data from a text file.
 
-    Inputs:
-        path: A path-like object representing a file system path. A path-like object is either a string or bytes object representing a path.
-        filter: A string which specifies which files should be read.
+    Args:
+        path (str): A path-like object representing a file system path. A path-like object is either a string or bytes object representing a path.
+        filter (str): A string which specifies which files should be read.
 
-    Outputs:
-        data: DataFrame. Contains the imported data. Most of the src_formats also ensure that the data is sorted such that the independent variable is is ascending order.
+    Returns:
+        data (List[STS]): Contains the imported data as STS objects.
     """
     # Check if path leads to a file or a folder
     if os.path.isfile(path):
-        # If file ends with supported spm file extension,
-        # read file with appropraite import function
         paths = [path]
 
     # otherwise, path points to a folder so,

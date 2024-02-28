@@ -7,6 +7,10 @@ import pySPM
 from ..utilities import progbar
 
 
+def norm(x):
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
+
+
 def rescale_image(image):
     """Rescale images to 0-255 as type unit8 for use with open CV"""
     return (image - image.min()) * (1 / (image.max() - image.min()) * 255)
@@ -60,6 +64,7 @@ def flatten(images):
 
 def correct_image(
     image,
+    xyflatten=True,
     terrace=False,
     poly=True,
     equalize=True,
@@ -70,7 +75,8 @@ def correct_image(
     im = spiepy.Im()
     im.data = image
 
-    im, _ = spiepy.flatten_xy(im)
+    if xyflatten:
+        im, _ = spiepy.flatten_xy(im)
 
     if poly:
         im, _ = spiepy.flatten_poly_xy(im, deg=2)
@@ -95,13 +101,22 @@ def correct_image(
     return im
 
 
-def correct(images, terrace=False, poly=True, equalize=True, rescale=True, scar=False):
+def correct(
+    images,
+    terrace=False,
+    xyflatten=True,
+    poly=True,
+    equalize=True,
+    rescale=True,
+    scar=False,
+):
     output = []
     n = len(images)
     for i, image in enumerate(images):
         try:
             im = correct_image(
                 image,
+                xyflatten=xyflatten,
                 terrace=terrace,
                 poly=poly,
                 equalize=equalize,
@@ -110,12 +125,12 @@ def correct(images, terrace=False, poly=True, equalize=True, rescale=True, scar=
             )
             output.append(im)
 
-            # progbar(
-            #     i + 1,
-            #     n,
-            #     10,
-            #     "Corrcting images...Done" if i + 1 == n else "Corrcting images...",
-            # )
+            progbar(
+                i + 1,
+                n,
+                10,
+                "Corrcting images...Done" if i + 1 == n else "Corrcting images...",
+            )
 
         except Exception as error:
             print("Error:", error)
